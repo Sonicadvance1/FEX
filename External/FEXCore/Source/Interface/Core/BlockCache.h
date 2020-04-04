@@ -2,6 +2,7 @@
 #include "Interface/Context/Context.h"
 #include "LogManager.h"
 
+//#define MEM_PASSTHROUGH
 namespace FEXCore {
 class BlockCache {
 public:
@@ -33,11 +34,16 @@ public:
   }
 
   uintptr_t AddBlockMapping(uint64_t Address, void *Ptr) {
+#ifdef MEM_PASSTHROUGH
+    //For know, let's mirror
+    Address %= VirtualMemSize;
+#else
     if (ctx->Config.UnifiedMemory) {
       LogMan::Throw::A(Address >= MemoryBase, "Code Address before Memory Base");
       LogMan::Throw::A(Address < (MemoryBase + VirtualMemSize), "Code address after memory base");
       Address -= MemoryBase;
     }
+#endif
 
     uint64_t PageOffset = Address & (0x0FFF);
     Address >>= 12;
@@ -85,11 +91,16 @@ private:
   }
 
   uintptr_t FindCodePointerForAddress(uint64_t Address) {
+#ifdef MEM_PASSTHROUGH
+    //For know, let's mirror
+    Address %= VirtualMemSize;
+#else
     if (ctx->Config.UnifiedMemory) {
       LogMan::Throw::A(!(Address < MemoryBase), "Code Address before Memory Base");
       LogMan::Throw::A(!(Address > (MemoryBase + VirtualMemSize)), "Code address after memory base");
       Address -= MemoryBase;
     }
+#endif
 
     uint64_t PageOffset = Address & (0x0FFF);
     Address >>= 12;
