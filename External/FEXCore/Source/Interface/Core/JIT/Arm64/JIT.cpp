@@ -439,14 +439,14 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
 #if _M_X86_64
         CallRuntime(SyscallThunk);
 #else
-        using ClassPtrType = uint64_t (FEXCore::SyscallHandler::*)(FEXCore::Core::InternalThreadState *, FEXCore::HLE::SyscallArguments *);
+        using ClassPtrType = uint64_t (*)(FEXCore::SyscallHandler*, FEXCore::Core::InternalThreadState *, FEXCore::HLE::SyscallArguments *);
         union PtrCast {
           ClassPtrType ClassPtr;
           uintptr_t Data;
         };
 
         PtrCast Ptr;
-        Ptr.ClassPtr = &FEXCore::SyscallHandler::HandleSyscall;
+        Ptr.ClassPtr = &FEXCore::HandleSyscall;
         LoadConstant(x3, Ptr.Data);
         blr(x3);
 #endif
