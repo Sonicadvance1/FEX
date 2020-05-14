@@ -288,6 +288,8 @@ public:
   // X87 Ops
   template<size_t width>
   void FLD(OpcodeArgs);
+  template<uint64_t Lower, uint32_t Upper>
+  void FLD_Const(OpcodeArgs);
 
   template<size_t width>
   void FILD(OpcodeArgs);
@@ -295,8 +297,60 @@ public:
   template<size_t width, bool pop>
   void FST(OpcodeArgs);
 
+  template<bool pop>
+  void FST(OpcodeArgs);
+
+  template<size_t width, bool pop>
+  void FIST(OpcodeArgs);
+
+  enum class OpResult {
+    RES_ST0,
+    RES_STI,
+  };
+  template<size_t width, bool Integer, OpResult ResInST0>
   void FADD(OpcodeArgs);
+  template<size_t width, bool Integer, OpResult ResInST0>
   void FMUL(OpcodeArgs);
+  template<size_t width, bool Integer, bool reverse, OpResult ResInST0>
+  void FDIV(OpcodeArgs);
+  template<size_t width, bool Integer, bool reverse, OpResult ResInST0>
+  void FSUB(OpcodeArgs);
+  void FCHS(OpcodeArgs);
+  void FABS(OpcodeArgs);
+  void FTST(OpcodeArgs);
+  void FRNDINT(OpcodeArgs);
+  void FXTRACT(OpcodeArgs);
+  void FNINIT(OpcodeArgs);
+
+  template<FEXCore::IR::IROps IROp>
+  void X87UnaryOp(OpcodeArgs);
+  template<FEXCore::IR::IROps IROp>
+  void X87BinaryOp(OpcodeArgs);
+  template<bool Inc>
+  void X87ModifySTP(OpcodeArgs);
+  void X87SinCos(OpcodeArgs);
+  template<bool Plus1>
+  void X87FYL2X(OpcodeArgs);
+  void X87TAN(OpcodeArgs);
+  void X87ATAN(OpcodeArgs);
+  void X87LDENV(OpcodeArgs);
+  void X87FNSTENV(OpcodeArgs);
+  void X87FSTCW(OpcodeArgs);
+  void X87LDSW(OpcodeArgs);
+  void X87FNSTSW(OpcodeArgs);
+  void X87FNSAVE(OpcodeArgs);
+  void X87FRSTOR(OpcodeArgs);
+  void X87FXAM(OpcodeArgs);
+  void X87FCMOV(OpcodeArgs);
+
+  void FXCH(OpcodeArgs);
+
+  enum class FCOMIFlags {
+    FLAGS_X87,
+    FLAGS_RFLAGS,
+  };
+  template<size_t width, bool Integer, FCOMIFlags whichflags, bool pop>
+  void FCOMI(OpcodeArgs);
 
   void FXSaveOp(OpcodeArgs);
   void FXRStoreOp(OpcodeArgs);
@@ -336,6 +390,9 @@ public:
   template<size_t ElementSize>
   void HSUBP(OpcodeArgs);
 
+  template<int FenceType>
+  void FenceOp(OpcodeArgs);
+
   void UnimplementedOp(OpcodeArgs);
 
 #undef OpcodeArgs
@@ -348,6 +405,7 @@ public:
 
 private:
   bool DecodeFailure{false};
+  FEXCore::IR::IROp_IRHeader *Current_Header{};
 
   OrderedNode *LoadSource(FEXCore::IR::RegisterClassType Class, FEXCore::X86Tables::DecodedOp const& Op, FEXCore::X86Tables::DecodedOperand const& Operand, uint32_t Flags, int8_t Align, bool LoadData = true, bool ForceLoad = false);
   OrderedNode *LoadSource_WithOpSize(FEXCore::IR::RegisterClassType Class, FEXCore::X86Tables::DecodedOp const& Op, FEXCore::X86Tables::DecodedOperand const& Operand, uint8_t OpSize, uint32_t Flags, int8_t Align, bool LoadData = true, bool ForceLoad = false);

@@ -252,6 +252,14 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
               uint64_t Src1 = Src >> 64;
               LogMan::Msg::I(">>>> Value[0] in Arg: 0x%lx, %ld", Src0, Src0);
               LogMan::Msg::I("     Value[1] in Arg: 0x%lx, %ld", Src1, Src1);
+
+              union {
+                __uint128_t i;
+                long double f;
+              } Val;
+              Val.i = Src;
+              LogMan::Msg::I("Value long double = %Lf 0x%Lx%Lx", Val.f, Src1, Src0);
+
             }
             else
               LogMan::Msg::A("Unknown value size: %d", OpSize);
@@ -556,6 +564,22 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             memcpy(GDP, Data, OpSize);
             break;
           }
+          case IR::OP_VLOADMEMELEMENT: {
+            auto Op = IROp->C<IR::IROp_VLoadMemElement>();
+            void const *Data{};
+            if (Thread->CTX->Config.UnifiedMemory) {
+              Data = *GetSrc<void const**>(Op->Header.Args[0]);
+            }
+            else {
+              Data = Thread->CTX->MemoryMapper.GetPointer<void const*>(*GetSrc<uint64_t*>(Op->Header.Args[0]));
+              LogMan::Throw::A(Data != nullptr, "Couldn't Map pointer to 0x%lx\n", *GetSrc<uint64_t*>(Op->Header.Args[0]));
+            }
+
+            memcpy(GDP, GetSrc<void*>(Op->Header.Args[1]), 16);
+            memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(GDP) + (Op->Header.ElementSize * Op->Index)),
+              Data, Op->Header.ElementSize);
+            break;
+          }
           case IR::OP_STOREMEM: {
             #define STORE_DATA(x, y) \
               case x: { \
@@ -592,6 +616,33 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
                 memcpy(Data, Src, 16);
                 break;
               }
+              default: LogMan::Msg::A("Unhandled StoreMem size"); break;
+            }
+            #undef STORE_DATA
+            break;
+          }
+          case IR::OP_VSTOREMEMELEMENT: {
+            #define STORE_DATA(x, y) \
+              case x: { \
+                y *Data{}; \
+                if (Thread->CTX->Config.UnifiedMemory) { \
+                  Data = *GetSrc<y**>(Op->Header.Args[0]); \
+                } \
+                else { \
+                  Data = Thread->CTX->MemoryMapper.GetPointer<y*>(*GetSrc<uint64_t*>(Op->Header.Args[0])); \
+                  LogMan::Throw::A(Data != nullptr, "Couldn't Map pointer to 0x%lx\n", *GetSrc<uint64_t*>(Op->Header.Args[0])); \
+                } \
+                memcpy(Data, &GetSrc<y*>(Op->Header.Args[1])[Op->Index], sizeof(y)); \
+                break; \
+              }
+
+            auto Op = IROp->C<IR::IROp_VStoreMemElement>();
+
+            switch (OpSize) {
+              STORE_DATA(1, uint8_t)
+              STORE_DATA(2, uint16_t)
+              STORE_DATA(4, uint32_t)
+              STORE_DATA(8, uint64_t)
               default: LogMan::Msg::A("Unhandled StoreMem size"); break;
             }
             #undef STORE_DATA
@@ -1144,6 +1195,17 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             uint64_t Src2 = *GetSrc<uint64_t*>(Op->Header.Args[1]);
             uint64_t Res = (Src1 & DestMask) | ((Src2 & SourceMask) << Op->lsb);
             GD = Res;
+            break;
+          }
+          case IR::OP_SBFE: {
+            auto Op = IROp->C<IR::IROp_Sbfe>();
+            LogMan::Throw::A(OpSize < 16, "OpSize is too large for BFE: %d", OpSize);
+            int64_t Src = *GetSrc<int64_t*>(Op->Header.Args[0]);
+            uint64_t ShiftLeftAmount = (64 - (Op->Width + Op->lsb));
+            uint64_t ShiftRightAmount = ShiftLeftAmount - Op->lsb;
+            Src <<= ShiftLeftAmount;
+            Src >>= ShiftRightAmount;
+            GD = Src;
             break;
           }
           case IR::OP_BFE: {
@@ -3281,6 +3343,20 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             memcpy(GDP, Tmp, OpSize);
             break;
           }
+
+          case IR::OP_VBSL: {
+            auto Op = IROp->C<IR::IROp_VBSL>();
+            __uint128_t Src1 = *GetSrc<__uint128_t*>(Op->Header.Args[0]);
+            __uint128_t Src2 = *GetSrc<__uint128_t*>(Op->Header.Args[1]);
+            __uint128_t Src3 = *GetSrc<__uint128_t*>(Op->Header.Args[2]);
+
+            __uint128_t Tmp{};
+            Tmp = Src2 & Src1;
+            Tmp |= Src3 & ~Src1;
+
+            memcpy(GDP, &Tmp, 16);
+            break;
+          }
           case IR::OP_VCMPEQ: {
             auto Op = IROp->C<IR::IROp_VCMPEQ>();
             void *Src1 = GetSrc<void*>(Op->Header.Args[0]);
@@ -3846,6 +3922,277 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             }
 
             memcpy(GDP, Tmp, OpSize);
+            break;
+          }
+          case IR::OP_F80ADD: {
+            auto Op = IROp->C<IR::IROp_F80Add>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src1 + Src2;
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80SUB: {
+            auto Op = IROp->C<IR::IROp_F80Sub>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src1 - Src2;
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80MUL: {
+            auto Op = IROp->C<IR::IROp_F80Mul>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src1 * Src2;
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80DIV: {
+            auto Op = IROp->C<IR::IROp_F80Div>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src1 / Src2;
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80FYL2X: {
+            auto Op = IROp->C<IR::IROp_F80FYL2X>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src2 * log2l(Src1);
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80ATAN: {
+            auto Op = IROp->C<IR::IROp_F80ATAN>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = atan2l(Src1, Src2);
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80FPREM1: {
+            auto Op = IROp->C<IR::IROp_F80FPREM1>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = remainderl(Src1, Src2);
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80FPREM: {
+            auto Op = IROp->C<IR::IROp_F80FPREM>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = fmodl(Src1, Src2);
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80SCALE: {
+            auto Op = IROp->C<IR::IROp_F80SCALE>();
+            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
+            long double Tmp;
+            Tmp = Src1 * exp2l(truncl(Src2));
+
+            memcpy(GDP, &Tmp, 10);
+            break;
+          }
+          case IR::OP_F80CVT: {
+            auto Op = IROp->C<IR::IROp_F80CVT>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+
+            switch (OpSize) {
+              case 4: {
+                float Tmp = Src;
+                memcpy(GDP, &Tmp, OpSize);
+                break;
+              }
+              case 8: {
+                double Tmp = Src;
+                memcpy(GDP, &Tmp, OpSize);
+                break;
+              }
+            default: LogMan::Msg::D("Unhandled size: %d", OpSize);
+            }
+            break;
+          }
+          case IR::OP_F80CVTINT: {
+            auto Op = IROp->C<IR::IROp_F80CVTInt>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = rintl(Src);
+
+            switch (OpSize) {
+              case 2: {
+                int16_t Tmp = Src;
+                memcpy(GDP, &Tmp, OpSize);
+                break;
+              }
+              case 4: {
+                int32_t Tmp = Src;
+                memcpy(GDP, &Tmp, OpSize);
+                break;
+              }
+              case 8: {
+                int64_t Tmp = Src;
+                memcpy(GDP, &Tmp, OpSize);
+                break;
+              }
+            default: LogMan::Msg::D("Unhandled size: %d", OpSize);
+            }
+            break;
+          }
+          case IR::OP_F80CVTTO: {
+            auto Op = IROp->C<IR::IROp_F80CVTTo>();
+
+            switch (Op->Size) {
+              case 4: {
+                float Src = *GetSrc<float *>(Op->Header.Args[0]);
+                long double Tmp = Src;
+                memcpy(GDP, &Tmp, 10);
+                break;
+              }
+              case 8: {
+                double Src = *GetSrc<double *>(Op->Header.Args[0]);
+                long double Tmp = Src;
+                memcpy(GDP, &Tmp, 10);
+                break;
+              }
+            default: LogMan::Msg::D("Unhandled size: %d", OpSize);
+            }
+            break;
+          }
+          case IR::OP_F80CVTTOINT: {
+            auto Op = IROp->C<IR::IROp_F80CVTToInt>();
+
+            switch (Op->Size) {
+              case 2: {
+                int16_t Src = *GetSrc<int16_t*>(Op->Header.Args[0]);
+                long double Tmp = Src;
+                memcpy(GDP, &Tmp, 10);
+                break;
+              }
+              case 4: {
+                int32_t Src = *GetSrc<int32_t*>(Op->Header.Args[0]);
+                long double Tmp = Src;
+                memcpy(GDP, &Tmp, 10);
+                break;
+              }
+            default: LogMan::Msg::D("Unhandled size: %d", OpSize);
+            }
+            break;
+          }
+          case IR::OP_F80ROUND: {
+            auto Op = IROp->C<IR::IROp_F80Round>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = rintl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80F2XM1: {
+            auto Op = IROp->C<IR::IROp_F80F2XM1>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = exp2l(Src) - 1.0;
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80TAN: {
+            auto Op = IROp->C<IR::IROp_F80TAN>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = tanl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80SQRT: {
+            auto Op = IROp->C<IR::IROp_F80SQRT>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = sqrtl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80SIN: {
+            auto Op = IROp->C<IR::IROp_F80SIN>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = sinl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80COS: {
+            auto Op = IROp->C<IR::IROp_F80COS>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = cosl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80XTRACT_EXP: {
+            auto Op = IROp->C<IR::IROp_F80XTRACT_EXP>();
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            Src = logbl(Src);
+            memcpy(GDP, &Src, 10);
+            break;
+          }
+          case IR::OP_F80XTRACT_SIG: {
+            auto Op = IROp->C<IR::IROp_F80XTRACT_SIG>();
+            union PackedLDouble {
+              long double f;
+              struct {
+                uint64_t Significand;
+                uint32_t Exp : 15;
+                uint32_t Sign : 1;
+              } Packed;
+            };
+            PackedLDouble Result;
+            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            int Tmp;
+            Result.f = frexpl(Src, &Tmp);
+            Result.Packed.Exp = 0x3FFF;
+            Result.Packed.Sign = std::signbit(Src);
+            memcpy(GDP, &Result, 10);
+            break;
+          }
+
+          case IR::OP_F80CMP: {
+            auto Op = IROp->C<IR::IROp_F80Cmp>();
+            uint32_t ResultFlags{};
+            long double Src1 = *GetSrc<long double*>(Op->Header.Args[0]);
+            long double Src2 = *GetSrc<long double*>(Op->Header.Args[1]);
+            if (Op->Flags & (1 << FCMP_FLAG_LT)) {
+              if (Src1 < Src2) {
+                ResultFlags |= (1 << FCMP_FLAG_LT);
+              }
+            }
+            if (Op->Flags & (1 << FCMP_FLAG_UNORDERED)) {
+              if (std::isnan(Src1) || std::isnan(Src2)) {
+                ResultFlags |= (1 << FCMP_FLAG_UNORDERED);
+              }
+            }
+            if (Op->Flags & (1 << FCMP_FLAG_EQ)) {
+              if (Src1 == Src2) {
+                ResultFlags |= (1 << FCMP_FLAG_EQ);
+              }
+            }
+
+            GD = ResultFlags;
+            break;
+          }
+          case IR::OP_FENCE: {
+            std::atomic_thread_fence(std::memory_order_acq_rel);
             break;
           }
           default:

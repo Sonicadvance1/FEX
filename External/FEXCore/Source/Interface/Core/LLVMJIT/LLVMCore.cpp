@@ -48,6 +48,55 @@ static void SetExitState_Thunk(FEXCore::Core::InternalThreadState *Thread) {
   Thread->State.RunningEvents.ShouldStop = true;
 }
 
+
+static long double F80Add_Thunk(long double a, long double b) {
+  return a + b;
+}
+
+static long double F80Sub_Thunk(long double a, long double b) {
+  return a - b;
+}
+
+static long double F80Mul_Thunk(long double a, long double b) {
+  return a * b;
+}
+
+static long double F80Div_Thunk(long double a, long double b) {
+  return a / b;
+}
+
+static float F80CVT32_Thunk(long double a) {
+  return a;
+}
+
+static double F80CVT64_Thunk(long double a) {
+  return a;
+}
+
+static int16_t F80CVT16Int_Thunk(long double a) {
+  return rintl(a);
+}
+
+static int32_t F80CVT32Int_Thunk(long double a) {
+  return rintl(a);
+}
+
+static int64_t F80CVT64Int_Thunk(long double a) {
+  return rintl(a);
+}
+
+static long double F80CVTFrom32_Thunk(float a) {
+  return a;
+}
+
+static long double F80CVTFrom64_Thunk(double a) {
+  return a;
+}
+
+static long double F80Round_Thunk(long double a) {
+  return rintl(a);
+}
+
 #if defined(_M_ARM_64) && !defined(AARCH64_ON_X86)
 static uint64_t AArch64ReadCycleCounter() {
   uint64_t res{};
@@ -108,6 +157,19 @@ private:
 #if defined(_M_ARM_64) && !defined(AARCH64_ON_X86)
     llvm::Function *AArch64ReadCycleCounterFunction;
 #endif
+    // x80 functions
+    llvm::Function *F80Add;
+    llvm::Function *F80Sub;
+    llvm::Function *F80Mul;
+    llvm::Function *F80Div;
+    llvm::Function *F80CVT32;
+    llvm::Function *F80CVT64;
+    llvm::Function *F80CVT16Int;
+    llvm::Function *F80CVT32Int;
+    llvm::Function *F80CVT64Int;
+    llvm::Function *F80CVTFrom32;
+    llvm::Function *F80CVTFrom64;
+    llvm::Function *F80Round;
 
     llvm::Function *ValidateLoad8;
     llvm::Function *ValidateLoad16;
@@ -212,7 +274,7 @@ private:
     // The lower 64bits being the results we desire
     auto ZeroVector = JITState.IRBuilder->CreateVectorSplat(DestNumElements, JITState.IRBuilder->getIntN(DestElementSize * 8, 0));
 
-    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant);
+    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant, "VSQXTN_64");
 #elif _M_ARM_64
     Arg = CastVectorToType(Arg, true, 16, ElementSize);
     RegisterSize <<= 1;
@@ -276,7 +338,7 @@ private:
     ArgUpper = VSQXTN_64(ArgUpper, RegisterSize, ElementSize);
 
     // This will convert to VSQXTN2 in AArch64
-    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant);
+    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant, "VSQXTN2_64");
   }
 
   llvm::Value *VSQXTUN_64(llvm::Value *Arg, uint8_t RegisterSize, uint8_t ElementSize) {
@@ -291,7 +353,7 @@ private:
     for (uint32_t i = 0; i < (RegisterSize / ElementSize * 2); ++i) {
       LargeVectorMask.emplace_back(i);
     }
-    Arg = JITState.IRBuilder->CreateShuffleVector(Arg, UndefVector, LargeVectorMask);
+    Arg = JITState.IRBuilder->CreateShuffleVector(Arg, UndefVector, LargeVectorMask, "VSQXTUN_64");
 
     RegisterSize <<= 1;
 
@@ -335,7 +397,7 @@ private:
     // The lower 64bits being the results we desire
     auto ZeroVector = JITState.IRBuilder->CreateVectorSplat(DestNumElements, JITState.IRBuilder->getIntN(DestElementSize * 8, 0));
 
-    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant);
+    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant, "VSQXTUN_64");
 #elif _M_ARM_64
     Arg = CastVectorToType(Arg, true, 16, ElementSize);
     RegisterSize <<= 1;
@@ -398,7 +460,7 @@ private:
     ArgUpper = VSQXTUN_64(ArgUpper, RegisterSize, ElementSize);
 
     // This will convert to VSQXTN2 in AArch64
-    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant);
+    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant, "VSQXTUN2_64");
   }
 
   llvm::Value *VSQXTN(llvm::Value *Arg, uint8_t RegisterSize, uint8_t ElementSize) {
@@ -441,7 +503,7 @@ private:
     // The lower 64bits being the results we desire
     auto ZeroVector = JITState.IRBuilder->CreateVectorSplat(DestNumElements, JITState.IRBuilder->getIntN(DestElementSize * 8, 0));
 
-    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant);
+    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant, "VSQXTN");
 
 #elif _M_ARM_64
     std::vector<llvm::Type*> ArgTypes = {
@@ -488,7 +550,7 @@ private:
     }
 
     // This will convert to VSQXTN2 in AArch64
-    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant);
+    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant, "VSQXTN2");
   }
 
   llvm::Value *VSQXTUN(llvm::Value *Arg, uint8_t RegisterSize, uint8_t ElementSize) {
@@ -531,7 +593,7 @@ private:
     // The lower 64bits being the results we desire
     auto ZeroVector = JITState.IRBuilder->CreateVectorSplat(DestNumElements, JITState.IRBuilder->getIntN(DestElementSize * 8, 0));
 
-    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant);
+    Result = JITState.IRBuilder->CreateShuffleVector(Result, ZeroVector, VectorMaskConstant, "VSQXTUN");
 
 #elif _M_ARM_64
     std::vector<llvm::Type*> ArgTypes = {
@@ -578,7 +640,7 @@ private:
     }
 
     // This will convert to VSQXTUN2 in AArch64
-    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant);
+    return JITState.IRBuilder->CreateShuffleVector(ArgLower, ArgUpper, VectorMaskConstant, "VSQXTUN2");
   }
 
   llvm::Value *VADDP(llvm::Value *ArgLower, llvm::Value *ArgUpper, uint8_t RegisterSize, uint8_t ElementSize) {
@@ -773,7 +835,7 @@ private:
   void CreateGlobalVariables(llvm::ExecutionEngine *Engine, llvm::Module *FunctionModule);
 
   llvm::Value *CastVectorToType(llvm::Value *Arg, bool Integer, uint8_t RegisterSize, uint8_t ElementSize);
-  llvm::Value *CastScalarToType(llvm::Value *Arg, bool Integer, uint8_t RegisterSize, uint8_t ElementSize);
+  llvm::Value *CastScalarToType(llvm::Value *Arg, bool Integer, uint8_t ElementSize);
   llvm::Value *CastToOpaqueStructure(llvm::Value *Arg, llvm::Type *DstType);
   void SetDest(IR::OrderedNodeWrapper Op, llvm::Value *Val);
   llvm::Value *GetSrc(IR::OrderedNodeWrapper Src);
@@ -922,6 +984,10 @@ void LLVMJITCore::CreateGlobalVariables(llvm::ExecutionEngine *Engine, llvm::Mod
   Type *i64 = Type::getInt64Ty(*Con);
   Type *i128 = Type::getInt128Ty(*Con);
 
+  Type *f32 = Type::getFloatTy(*Con);
+  Type *f64 = Type::getDoubleTy(*Con);
+  Type *f80 = Type::getX86_FP80Ty(*Con);
+
   // Syscall Function
   {
     auto FuncType = FunctionType::get(i64,
@@ -987,6 +1053,257 @@ void LLVMJITCore::CreateGlobalVariables(llvm::ExecutionEngine *Engine, llvm::Mod
     Engine->addGlobalMapping(JITCurrentState.AArch64ReadCycleCounterFunction, Ptr.Data);
   }
 #endif
+
+  // F80 Add Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f80, f80
+      },
+      false);
+    JITCurrentState.F80Add = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80Add",
+      FunctionModule);
+    using ClassPtrType = long double (*)(long double, long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80Add_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80Add, Ptr.Data);
+  }
+
+  // F80 Sub Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f80, f80
+      },
+      false);
+    JITCurrentState.F80Sub = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80Sub",
+      FunctionModule);
+    using ClassPtrType = long double (*)(long double, long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80Sub_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80Sub, Ptr.Data);
+  }
+
+  // F80 Mul Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f80, f80
+      },
+      false);
+    JITCurrentState.F80Mul = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80Mul",
+      FunctionModule);
+    using ClassPtrType = long double (*)(long double, long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80Mul_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80Mul, Ptr.Data);
+  }
+
+  // F80 DIV Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f80, f80
+      },
+      false);
+    JITCurrentState.F80Div = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80Div",
+      FunctionModule);
+    using ClassPtrType = long double (*)(long double, long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80Div_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80Div, Ptr.Data);
+  }
+
+  // F80 CVT32 Function
+  {
+    auto FuncType = FunctionType::get(f32,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80CVT32 = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVT32",
+      FunctionModule);
+    using ClassPtrType = float (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVT32_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVT32, Ptr.Data);
+  }
+
+  // F80 CVT64 Function
+  {
+    auto FuncType = FunctionType::get(f64,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80CVT64 = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVT64",
+      FunctionModule);
+    using ClassPtrType = double (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVT64_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVT64, Ptr.Data);
+  }
+
+  // F80 CVT16Int Function
+  {
+    auto FuncType = FunctionType::get(i16,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80CVT16Int = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVT16Int",
+      FunctionModule);
+    using ClassPtrType = int16_t (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVT16Int_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVT16Int, Ptr.Data);
+  }
+
+  // F80 CVT32Int Function
+  {
+    auto FuncType = FunctionType::get(i32,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80CVT32Int = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVT32Int",
+      FunctionModule);
+    using ClassPtrType = int32_t (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVT32Int_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVT32Int, Ptr.Data);
+  }
+
+  // F80 CVT64Int Function
+  {
+    auto FuncType = FunctionType::get(i64,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80CVT64Int = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVT64Int",
+      FunctionModule);
+    using ClassPtrType = int64_t (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVT64Int_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVT64Int, Ptr.Data);
+  }
+
+  // F80 CVT32 From Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f32
+      },
+      false);
+    JITCurrentState.F80CVTFrom32 = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVTFrom32",
+      FunctionModule);
+    using ClassPtrType = long double (*)(float);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVTFrom32_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVTFrom32, Ptr.Data);
+  }
+
+  // F80 CVT64 From Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f64
+      },
+      false);
+    JITCurrentState.F80CVTFrom64 = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80CVTFrom64",
+      FunctionModule);
+    using ClassPtrType = long double (*)(double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80CVTFrom64_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80CVTFrom64, Ptr.Data);
+  }
+  // F80 Round Function
+  {
+    auto FuncType = FunctionType::get(f80,
+      {
+        f80
+      },
+      false);
+    JITCurrentState.F80Round = Function::Create(FuncType,
+      Function::ExternalLinkage,
+      "F80Round",
+      FunctionModule);
+    using ClassPtrType = long double (*)(long double);
+    union PtrCast {
+      ClassPtrType ClassPtr;
+      void* Data;
+    };
+    PtrCast Ptr;
+    Ptr.ClassPtr = &F80Round_Thunk;
+    Engine->addGlobalMapping(JITCurrentState.F80Round, Ptr.Data);
+  }
 
   // Exit VM function
   {
@@ -1376,6 +1693,7 @@ llvm::Value *LLVMJITCore::CreateIndexedContextPtr(llvm::Value *Index, uint64_t O
 llvm::Value *LLVMJITCore::CastVectorToType(llvm::Value *Arg, bool Integer, uint8_t RegisterSize, uint8_t ElementSize) {
   uint8_t DestSizeInBits = RegisterSize * ElementSize * 8;
   uint8_t NumElements = RegisterSize / ElementSize;
+
   llvm::Type *ElementType;
   if (Integer) {
     ElementType = llvm::Type::getIntNTy(*Con, ElementSize * 8);
@@ -1411,11 +1729,11 @@ llvm::Value *LLVMJITCore::CastVectorToType(llvm::Value *Arg, bool Integer, uint8
   for (uint32_t i = 0; i < NumElements; ++i)
     Mask.emplace_back(i);
 
-  return JITState.IRBuilder->CreateShuffleVector(Arg, Undef, Mask);
+  return JITState.IRBuilder->CreateShuffleVector(Arg, Undef, Mask, "CastVectorToType");
 }
 
-llvm::Value *LLVMJITCore::CastScalarToType(llvm::Value *Arg, bool Integer, uint8_t RegisterSize, uint8_t ElementSize) {
-  llvm::Type *ElementType;
+llvm::Value *LLVMJITCore::CastScalarToType(llvm::Value *Arg, bool Integer, uint8_t ElementSize) {
+  llvm::Type *ElementType{};
   if (Integer) {
     ElementType = llvm::Type::getIntNTy(*Con, ElementSize * 8);
   }
@@ -1423,11 +1741,18 @@ llvm::Value *LLVMJITCore::CastScalarToType(llvm::Value *Arg, bool Integer, uint8
     if (ElementSize == 4) {
       ElementType = llvm::Type::getFloatTy(*Con);
     }
-    else {
+    else if (ElementSize == 8) {
       ElementType = llvm::Type::getDoubleTy(*Con);
+    }
+    else if (ElementSize == 10) {
+      ElementType = llvm::Type::getX86_FP80Ty(*Con);
+    }
+    else {
+      LogMan::Msg::A("Unhandled ElementSize for scalar convert: %d", ElementSize);
     }
   }
 
+  Arg = CastToOpaqueStructure(Arg, llvm::Type::getIntNTy(*Con, ElementSize * 8));
   return JITState.IRBuilder->CreateBitCast(Arg, ElementType);
 }
 
@@ -1437,6 +1762,10 @@ llvm::Value *LLVMJITCore::CastToOpaqueStructure(llvm::Value *Arg, llvm::Type *Ds
     unsigned ElementSize = Arg->getType()->getVectorElementType()->getPrimitiveSizeInBits();
     unsigned NumElements = Arg->getType()->getVectorNumElements();
     auto NewIntegerType = llvm::Type::getIntNTy(*Con, ElementSize * NumElements);
+    Arg = JITState.IRBuilder->CreateBitCast(Arg, NewIntegerType);
+  }
+  else if (!Arg->getType()->isIntegerTy()) {
+    auto NewIntegerType = llvm::Type::getIntNTy(*Con, Arg->getType()->getPrimitiveSizeInBits());
     Arg = JITState.IRBuilder->CreateBitCast(Arg, NewIntegerType);
   }
 
@@ -2435,8 +2764,8 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Src2 = GetSrc(Op->Header.Args[1]);
 
       // Cast to the type we want
-      Src1 = CastScalarToType(Src1, false, OpSize * 8, Op->ElementSize);
-      Src2 = CastScalarToType(Src2, false, OpSize * 8, Op->ElementSize);
+      Src1 = CastScalarToType(Src1, false, Op->ElementSize);
+      Src2 = CastScalarToType(Src2, false, Op->ElementSize);
 
       llvm::Value *Result = JITState.IRBuilder->getInt64(0);
       if (Op->Flags & (1 << IR::FCMP_FLAG_LT)) {
@@ -2510,7 +2839,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Src = GetSrc(Op->Header.Args[0]);
 
       // Cast to the type we want
-      Src = CastScalarToType(Src, true, OpSize, OpSize);
+      Src = CastScalarToType(Src, true, OpSize);
       SetDest(*WrapperOp, Src);
       break;
     }
@@ -2528,7 +2857,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Src = GetSrc(Op->Header.Args[0]);
 
       // Cast to the type we want
-      Src = CastVectorToType(Src, true, Src->getType()->getPrimitiveSizeInBits(), Op->Header.ElementSize);
+      Src = CastVectorToType(Src, true, Src->getType()->getPrimitiveSizeInBits() / 8, Op->Header.ElementSize);
 
       auto Result = JITState.IRBuilder->CreateExtractElement(Src, JITState.IRBuilder->getInt32(Op->Idx));
       Result = JITState.IRBuilder->CreateZExt(Result, Type::getInt64Ty(*Con));
@@ -3377,7 +3706,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
         Mask.emplace_back(i);
       }
       // Shuffle out which elements we actually want
-      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask);
+      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask, "VSXTL");
       auto Result = JITState.IRBuilder->CreateSExt(Src, TargetType);
       SetDest(*WrapperOp, Result);
       break;
@@ -3398,7 +3727,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
         Mask.emplace_back(i);
       }
       // Shuffle out which elements we actually want
-      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask);
+      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask, "VSXTL2");
       auto Result = JITState.IRBuilder->CreateSExt(Src, TargetType);
       SetDest(*WrapperOp, Result);
       break;
@@ -3419,7 +3748,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
         Mask.emplace_back(i);
       }
       // Shuffle out which elements we actually want
-      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask);
+      Src = JITState.IRBuilder->CreateShuffleVector(Src, Src, Mask, "VUXTL");
       auto Result = JITState.IRBuilder->CreateZExt(Src, TargetType);
       SetDest(*WrapperOp, Result);
       break;
@@ -3536,7 +3865,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
 
       auto VectorMaskConstant = ConstantDataVector::get(*Con, VectorMask);
 
-      auto Result = JITState.IRBuilder->CreateShuffleVector(Src2, Src1, VectorMaskConstant);
+      auto Result = JITState.IRBuilder->CreateShuffleVector(Src2, Src1, VectorMaskConstant, "VEXTR");
 
       SetDest(*WrapperOp, Result);
       break;
@@ -3562,7 +3891,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
 
       auto VectorMaskConstant = ConstantDataVector::get(*Con, VectorMask);
 
-      auto Result = JITState.IRBuilder->CreateShuffleVector(Src1, Src2, VectorMaskConstant);
+      auto Result = JITState.IRBuilder->CreateShuffleVector(Src1, Src2, VectorMaskConstant, "VZIP{2}");
 
       SetDest(*WrapperOp, Result);
     break;
@@ -3589,7 +3918,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
 
       // Cast to the type we want
       Src1 = CastVectorToType(Src1, true, OpSize, Op->Header.ElementSize);
-      Src2 = CastScalarToType(Src2, true, OpSize, Op->Header.ElementSize);
+      Src2 = CastScalarToType(Src2, true, Op->Header.ElementSize);
 
       // Extract our source index
       auto Result = JITState.IRBuilder->CreateInsertElement(Src1, Src2, JITState.IRBuilder->getInt32(Op->DestIdx));
@@ -3720,7 +4049,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Src = GetSrc(Op->Header.Args[0]);
 
       // Cast to the type we want
-      Src = CastScalarToType(Src, false, OpSize * 8, Op->SrcElementSize);
+      Src = CastScalarToType(Src, false, Op->SrcElementSize);
 
       switch (Conv) {
         case 0x0804: { // Double <- float
@@ -3742,7 +4071,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Op = IROp->C<IR::IROp_Float_ToGPR_ZU>();
       auto Src = GetSrc(Op->Header.Args[0]);
 
-      Src = CastScalarToType(Src, false, Op->Header.ElementSize, Op->Header.ElementSize);
+      Src = CastScalarToType(Src, false, Op->Header.ElementSize);
 
       switch (Op->Header.ElementSize) {
         case 4: {
@@ -3763,7 +4092,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       auto Op = IROp->C<IR::IROp_Float_ToGPR_ZS>();
       auto Src = GetSrc(Op->Header.Args[0]);
 
-      Src = CastScalarToType(Src, false, Op->Header.ElementSize, Op->Header.ElementSize);
+      Src = CastScalarToType(Src, false, Op->Header.ElementSize);
 
       switch (Op->Header.ElementSize) {
         case 4: {
@@ -3865,7 +4194,7 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
       }
 
       auto Type = Type::getIntNTy(*Con, Op->Size * 8);
-      Src = JITState.IRBuilder->CreateZExtOrTrunc(Src, Type);
+      Src = CastToOpaqueStructure(Src, Type);
       Dst = JITState.IRBuilder->CreateIntToPtr(Dst, Type->getPointerTo());
       CreateMemoryStore(Dst, Src, Op->Align);
     break;
@@ -3892,10 +4221,205 @@ void LLVMJITCore::HandleIR(FEXCore::IR::IRListView<true> const *IR, IR::NodeWrap
         default: LogMan::Msg::A("Unknown Atomic Op: %d", IROp->Op);
       }
       // Cast the pointer type correctly
-      Src = JITState.IRBuilder->CreateIntToPtr(Src, Type::getIntNTy(*Con, Op->Size * 8)->getPointerTo());
+      auto Type = Type::getIntNTy(*Con, Op->Size * 8);
+      Src = JITState.IRBuilder->CreateIntToPtr(Src, Type->getPointerTo());
+      Value = CastToOpaqueStructure(Value, Type);
       auto Result = JITState.IRBuilder->CreateAtomicRMW(AtomicOp, Src, Value, AtomicOrdering::AcquireRelease);
       SetDest(*WrapperOp, Result);
     break;
+    }
+    case IR::OP_F80ADD: {
+      auto Op = IROp->C<IR::IROp_F80Add>();
+      auto Src1 = GetSrc(Op->Header.Args[0]);
+      auto Src2 = GetSrc(Op->Header.Args[1]);
+
+      // Cast to the type we want
+      Src1 = CastScalarToType(Src1, false, 10);
+      Src2 = CastScalarToType(Src2, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src1);
+      Args.emplace_back(Src2);
+      llvm::Value *Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80Add, Args);
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80SUB: {
+      auto Op = IROp->C<IR::IROp_F80Sub>();
+      auto Src1 = GetSrc(Op->Header.Args[0]);
+      auto Src2 = GetSrc(Op->Header.Args[1]);
+
+      // Cast to the type we want
+      Src1 = CastScalarToType(Src1, false, 10);
+      Src2 = CastScalarToType(Src2, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src1);
+      Args.emplace_back(Src2);
+      llvm::Value *Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80Sub, Args);
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80MUL: {
+      auto Op = IROp->C<IR::IROp_F80Mul>();
+      auto Src1 = GetSrc(Op->Header.Args[0]);
+      auto Src2 = GetSrc(Op->Header.Args[1]);
+
+      // Cast to the type we want
+      Src1 = CastScalarToType(Src1, false, 10);
+      Src2 = CastScalarToType(Src2, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src1);
+      Args.emplace_back(Src2);
+      llvm::Value *Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80Mul, Args);
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80DIV: {
+      auto Op = IROp->C<IR::IROp_F80Div>();
+      auto Src1 = GetSrc(Op->Header.Args[0]);
+      auto Src2 = GetSrc(Op->Header.Args[1]);
+
+      // Cast to the type we want
+      Src1 = CastScalarToType(Src1, false, 10);
+      Src2 = CastScalarToType(Src2, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src1);
+      Args.emplace_back(Src2);
+      llvm::Value *Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80Div, Args);
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80CVT: {
+      auto Op = IROp->C<IR::IROp_F80CVT>();
+      auto Src = GetSrc(Op->Header.Args[0]);
+
+      // Cast to the type we want
+      Src = CastScalarToType(Src, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src);
+      llvm::Value *Result{};
+      switch (OpSize) {
+        case 4:
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVT32, Args);
+        break;
+        case 8:
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVT64, Args);
+        break;
+        default: LogMan::Msg::A("Unhandled ElementSize: %d", OpSize);
+      }
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80CVTINT: {
+      auto Op = IROp->C<IR::IROp_F80CVTInt>();
+      auto Src = GetSrc(Op->Header.Args[0]);
+
+      // Cast to the type we want
+      Src = CastScalarToType(Src, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src);
+      llvm::Value *Result{};
+      switch (OpSize) {
+        case 2:
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVT16Int, Args);
+        break;
+        case 4:
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVT32Int, Args);
+        break;
+        case 8:
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVT64Int, Args);
+        break;
+        default: LogMan::Msg::A("Unhandled ElementSize: %d", OpSize);
+      }
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80CVTTO: {
+      auto Op = IROp->C<IR::IROp_F80CVTTo>();
+      auto Src = GetSrc(Op->Header.Args[0]);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src);
+      llvm::Value *Result{};
+      switch (Op->Size) {
+        case 4:
+          // Cast to the type we want
+          Src = CastScalarToType(Src, false, 4);
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVTFrom32, Args);
+        break;
+        case 8:
+          // Cast to the type we want
+          Src = CastScalarToType(Src, false, 8);
+          Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80CVTFrom64, Args);
+        break;
+        default: LogMan::Msg::A("Unhandled ElementSize: %d", OpSize);
+      }
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80ROUND: {
+      auto Op = IROp->C<IR::IROp_F80Round>();
+      auto Src = GetSrc(Op->Header.Args[0]);
+
+      // Cast to the type we want
+      Src = CastScalarToType(Src, false, 10);
+
+      std::vector<llvm::Value*> Args{};
+
+      Args.emplace_back(Src);
+      llvm::Value *Result = JITState.IRBuilder->CreateCall(JITCurrentState.F80Round, Args);
+      Result = CastToOpaqueStructure(Result, Type::getIntNTy(*Con, 128));
+      SetDest(*WrapperOp, Result);
+      break;
+    }
+    case IR::OP_F80CMP: {
+      auto Op = IROp->C<IR::IROp_F80Cmp>();
+      auto Src1 = GetSrc(Op->Header.Args[0]);
+      auto Src2 = GetSrc(Op->Header.Args[1]);
+
+      // Cast to the type we want
+      Src1 = CastScalarToType(Src1, false, 10);
+      Src2 = CastScalarToType(Src2, false, 10);
+
+      llvm::Value *Result = JITState.IRBuilder->getInt64(0);
+      if (Op->Flags & (1 << IR::FCMP_FLAG_LT)) {
+        auto FCmp = JITState.IRBuilder->CreateFCmpOLT(Src1, Src2);
+        FCmp = JITState.IRBuilder->CreateZExt(FCmp, Result->getType());
+        FCmp = JITState.IRBuilder->CreateShl(FCmp, JITState.IRBuilder->getInt64(IR::FCMP_FLAG_LT));
+        Result = JITState.IRBuilder->CreateOr(Result, FCmp);
+      }
+      if (Op->Flags & (1 << IR::FCMP_FLAG_UNORDERED)) {
+        auto FCmp = JITState.IRBuilder->CreateFCmpUNO(Src1, Src2);
+        FCmp = JITState.IRBuilder->CreateZExt(FCmp, Result->getType());
+        FCmp = JITState.IRBuilder->CreateShl(FCmp, JITState.IRBuilder->getInt64(IR::FCMP_FLAG_UNORDERED));
+        Result = JITState.IRBuilder->CreateOr(Result, FCmp);
+      }
+      if (Op->Flags & (1 << IR::FCMP_FLAG_EQ)) {
+        auto FCmp = JITState.IRBuilder->CreateFCmpUEQ(Src1, Src2);
+        FCmp = JITState.IRBuilder->CreateZExt(FCmp, Result->getType());
+        FCmp = JITState.IRBuilder->CreateShl(FCmp, JITState.IRBuilder->getInt64(IR::FCMP_FLAG_EQ));
+        Result = JITState.IRBuilder->CreateOr(Result, FCmp);
+      }
+
+      SetDest(*WrapperOp, Result);
+      break;
     }
     case IR::OP_DUMMY:
     break;
@@ -4060,6 +4584,8 @@ void* FEXCore::CPU::LLVMJITCore::CompileCode(FEXCore::IR::IRListView<true> const
     verifyModule(*FunctionModule, &Out);
   }
 
+  auto start = std::chrono::high_resolution_clock::now();
+
   MPM.run(*FunctionModule, MAM);
   Engine->finalizeObject();
 
@@ -4069,6 +4595,15 @@ void* FEXCore::CPU::LLVMJITCore::CompileCode(FEXCore::IR::IRListView<true> const
     DebugData->HostCodeSize = JITState.MemManager->GetLastCodeAllocation();
   }
   void *FunctionPtr = reinterpret_cast<void*>(Engine->getFunctionAddress(FunctionName.str()));
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto time = end - start;
+  static uint64_t MaxTime{};
+  if (MaxTime < time.count()) {
+    MaxTime = time.count();
+    LogMan::Msg::D("SSACount %d Took %ldns to compile", IR->GetSSACount(), time.count());
+    LogMan::Msg::D("Entry: 0x%lx ; disas %p,%p", HeaderOp->Entry, FunctionPtr, (uint64_t)FunctionPtr + JITState.MemManager->GetLastCodeAllocation());
+  }
 
   return FunctionPtr;
 }

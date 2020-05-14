@@ -41,6 +41,7 @@
 
   "Ops": {
     "Dummy": {
+      "HasSideEffects": true,
       "OpClass": "Misc",
       "SwitchGen": false
     },
@@ -53,7 +54,8 @@
       ],
       "Args": [
         "uint64_t", "Entry",
-        "uint32_t", "BlockCount"
+        "uint32_t", "BlockCount",
+        "bool", "ShouldInterpret"
       ]
     },
     "CodeBlock": {
@@ -72,6 +74,7 @@
     },
 
     "EndBlock": {
+      "HasSideEffects": true,
       "OpClass": "Misc",
       "SwitchGen": false,
       "Args": [
@@ -102,7 +105,16 @@
       "OpClass": "Branch"
     },
 
+    "Fence": {
+      "HasSideEffects": true,
+      "OpClass": "Misc",
+      "Args":[
+        "uint8_t", "FenceType"
+      ]
+    },
+
     "CASPair": {
+      "HasSideEffects": true,
       "OpClass": "Atomic",
       "Desc": ["Does a compare and exchange with two GPRPair values",
                "ssa0 is the comparison value",
@@ -138,6 +150,7 @@
     },
 
     "StoreContextPair": {
+      "HasSideEffects": true,
       "OpClass": "Memory",
       "Desc": ["Stores a pair of values back in to the context"],
       "SSAArgs": "1",
@@ -213,6 +226,7 @@
     },
 
     "Break": {
+      "HasSideEffects": true,
       "OpClass": "Misc",
       "Args": [
         "uint8_t", "Reason",
@@ -221,10 +235,12 @@
     },
 
     "ExitFunction": {
+      "HasSideEffects": true,
       "OpClass": "Branch"
     },
 
     "Jump": {
+      "HasSideEffects": true,
       "OpClass": "Branch",
       "SSAArgs": "1",
       "SSANames": [
@@ -234,6 +250,7 @@
     },
 
     "CondJump": {
+      "HasSideEffects": true,
       "OpClass": "Branch",
       "SSAArgs": "3",
       "RAOverride": "1",
@@ -320,6 +337,7 @@
     },
 
     "StoreContext": {
+      "HasSideEffects": true,
       "Desc": ["Stores a value to the context with offset",
                "Ctx[Offset] = Value"
               ],
@@ -359,6 +377,7 @@
     },
 
     "StoreContextIndexed": {
+      "HasSideEffects": true,
       "Desc": ["Stores a value to the context with offset and indexed by SSA value",
                "Ctx[BaseOffset + Index * Stride] = Value"
               ],
@@ -377,6 +396,7 @@
     },
 
     "SpillRegister": {
+      "HasSideEffects": true,
       "Desc": ["Spills an SSA value to memory",
                "Spill slots are register allocated and has live ranges calculated to handle slot calculation",
                "```diff\n- !Don't use this op. It is for RA to handle spilling and filling!\n```"
@@ -421,6 +441,7 @@
     },
 
     "StoreFlag": {
+      "HasSideEffects": true,
       "Desc": ["Stores 1-bit of the flag in to the specified x86-64 flag",
                "Specialized to allow flexible implementation of flag handling"
               ],
@@ -435,6 +456,7 @@
     },
 
     "Syscall": {
+      "HasSideEffects": true,
       "OpClass": "Branch",
       "HasDest": true,
       "DestClass": "GPR",
@@ -468,6 +490,7 @@
     },
 
     "StoreMem": {
+      "HasSideEffects": true,
       "OpClass": "Memory",
       "SSAArgs": "2",
       "SSANames": [
@@ -478,6 +501,47 @@
         "uint8_t", "Size",
         "uint8_t", "Align",
         "RegisterClassType", "Class"
+      ]
+    },
+
+    "VLoadMemElement": {
+      "OpClass": "Memory",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "RegisterSize",
+      "NumElements": "RegisterSize / ElementSize",
+      "SSAArgs": "2",
+      "SSANames": [
+        "Addr",
+        "Value"
+      ],
+      "HelperArgs": [
+        "uint8_t", "RegisterSize",
+        "uint8_t", "ElementSize"
+      ],
+      "Args": [
+        "uint8_t", "Align",
+        "uint8_t", "Index"
+      ]
+    },
+
+    "VStoreMemElement": {
+      "HasSideEffects": true,
+      "OpClass": "Memory",
+      "SSAArgs": "2",
+      "DestSize": "ElementSize",
+      "NumElements": "RegisterSize / ElementSize",
+      "SSANames": [
+        "Addr",
+        "Value"
+      ],
+      "HelperArgs": [
+        "uint8_t", "RegisterSize",
+        "uint8_t", "ElementSize"
+      ],
+      "Args": [
+        "uint8_t", "Index",
+        "uint8_t", "Align"
       ]
     },
 
@@ -621,6 +685,19 @@
       "HasDest": true,
       "DestClass": "GPR",
       "SSAArgs": "2"
+    },
+
+    "LshlI": {
+      "Desc": ["Integer logical shift left by immediate"
+              ],
+      "OpClass": "ALU",
+      "HasDest": true,
+      "DestClass": "GPR",
+      "DestSize": "GetOpSize(ssa0)",
+      "SSAArgs": "1",
+      "Args": [
+        "uint8_t", "Shift"
+      ]
     },
 
     "Lshr": {
@@ -900,6 +977,7 @@
     },
 
     "CAS": {
+      "HasSideEffects": true,
       "Desc": ["Does a compare and swap of values to a memory location",
                "This mostly matches the C++ atomic_compare_exchange_strong function",
                "Dest = atomic_compare_exchange_strong(%Addr, %Expected, %Desired)",
@@ -922,6 +1000,7 @@
     },
 
     "AtomicAdd": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer add"
               ],
       "OpClass": "Atomic",
@@ -936,6 +1015,7 @@
     },
 
     "AtomicSub": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer sub"
               ],
       "OpClass": "Atomic",
@@ -950,6 +1030,7 @@
     },
 
     "AtomicAnd": {
+      "HasSideEffects": true,
       "Desc": ["Atomic binary and"
               ],
       "OpClass": "Atomic",
@@ -964,6 +1045,7 @@
     },
 
     "AtomicOr": {
+      "HasSideEffects": true,
       "Desc": ["Atomic binary or"
               ],
       "OpClass": "Atomic",
@@ -978,6 +1060,7 @@
     },
 
     "AtomicXor": {
+      "HasSideEffects": true,
       "Desc": ["Atomic binary exclusive or"
               ],
       "OpClass": "Atomic",
@@ -992,6 +1075,7 @@
     },
 
     "AtomicSwap": {
+      "HasSideEffects": true,
       "Desc": ["Atomic swap",
                "Atomically swaps contents of GPR and memory location"
               ],
@@ -1010,6 +1094,7 @@
     },
 
     "AtomicFetchAdd": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer fetch and add",
                "Atomically fetches %Addr and adds %value to the memory location",
                "Dest is the value prior to operating on the value in memory"
@@ -1029,6 +1114,7 @@
     },
 
     "AtomicFetchSub": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer fetch and sub",
                "Atomically fetches %Addr and subtracts %value to the memory location",
                "Dest is the value prior to operating on the value in memory"
@@ -1049,6 +1135,7 @@
     },
 
     "AtomicFetchAnd": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer fetch and binary and",
                "Atomically fetches %Addr and binary ands %value to the memory location",
                "Dest is the value prior to operating on the value in memory"
@@ -1068,6 +1155,7 @@
     },
 
     "AtomicFetchOr": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer fetch and binary or",
                "Atomically fetches %Addr and binary ors %value to the memory location",
                "Dest is the value prior to operating on the value in memory"
@@ -1087,6 +1175,7 @@
     },
 
     "AtomicFetchXor": {
+      "HasSideEffects": true,
       "Desc": ["Atomic integer fetch and binary exclusive or",
                "Atomically fetches %Addr and binary exclusive ors %value to the memory location",
                "Dest is the value prior to operating on the value in memory"
@@ -1180,11 +1269,13 @@
     },
 
     "Print": {
+      "HasSideEffects": true,
       "Desc": ["Debug operation that prints an SSA value to the console",
                "May only print 64bits of the value",
                "Depending on backend, may only support GPR printing"
               ],
       "OpClass": "Misc",
+      "DestSize": "GetOpSize(ssa0)",
       "SSAArgs": "1",
       "SSANames": [
         "Value"
@@ -1742,6 +1833,24 @@
       "HelperArgs": [
         "uint8_t", "RegisterSize",
         "uint8_t", "ElementSize"
+      ]
+    },
+
+    "VBSL": {
+      "Desc": ["Does a vector bitwise select.",
+               "If the bit in the field is 1 then the corresponding bit is pulled from VectorTrue",
+               "If the bit in the field is 0 then the corresponding bit is pulled from VectorFalse"
+              ],
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "3",
+      "SSANames": [
+        "VectorMask",
+        "VectorTrue",
+        "VectorFalse"
       ]
     },
 
@@ -2672,6 +2781,297 @@
       ],
       "Args": [
         "uint8_t", "Flag"
+      ]
+    },
+
+    "F80Add": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80Sub": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80Mul": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80Div": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80ATAN": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80FPREM": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80FPREM1": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80SCALE": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80CVT": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "Size",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ],
+      "HelperArgs": [
+        "uint8_t", "Size"
+      ]
+    },
+
+    "F80CVTInt": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "GPR",
+      "DestSize": "Size",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ],
+      "HelperArgs": [
+        "uint8_t", "Size"
+      ]
+    },
+
+    "F80CVTTo": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ],
+      "Args": [
+        "uint8_t", "Size"
+      ]
+    },
+
+    "F80CVTToInt": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ],
+      "Args": [
+        "uint8_t", "Size"
+      ]
+    },
+
+    "F80Round": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80F2XM1": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80FYL2X": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ]
+    },
+
+    "F80TAN": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80SQRT": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80SIN": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80COS": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80XTRACT_EXP": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80XTRACT_SIG": {
+      "OpClass": "Vector",
+      "HasDest": true,
+      "DestClass": "FPR",
+      "DestSize": "16",
+      "NumElements": "1",
+      "SSAArgs": "1",
+      "SSANames": [
+        "X80Src"
+      ]
+    },
+
+    "F80Cmp": {
+      "Desc": ["Does a scalar unordered compare and stores the asked for flags in to a GPR",
+               "Ordering flag result is true if either float input is NaN"
+              ],
+      "OpClass": "ALU",
+      "HasDest": true,
+      "DestClass": "GPR",
+      "DestSize": "4",
+      "SSAArgs": "2",
+      "SSANames": [
+        "X80Src1",
+        "X80Src2"
+      ],
+      "Args": [
+        "uint32_t", "Flags"
       ]
     },
 
