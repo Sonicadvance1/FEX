@@ -3640,6 +3640,7 @@ void OpDispatchBuilder::ResetWorkingList() {
   BlockSetRIP = false;
   DecodeFailure = false;
   ShouldDump = false;
+  CurrentCodeBlock = nullptr;
 }
 
 template<unsigned BitOffset>
@@ -5043,7 +5044,7 @@ void OpDispatchBuilder::FLD(OpcodeArgs) {
       data = _Zext(32, data);
 
     constexpr size_t mantissa_bits = (width == 32) ? 23 : 52;
-    constexpr size_t sign_bits = width - (mantissa_bits + 1);
+    constexpr size_t exponent_bits = width - (mantissa_bits + 1);
 
     uint64_t sign_mask = (width == 32) ? 0x80000000 : 0x8000000000000000;
     uint64_t exponent_mask = (width == 32) ? 0x7F800000 : 0x7FE0000000000000;
@@ -5053,7 +5054,7 @@ void OpDispatchBuilder::FLD(OpcodeArgs) {
     auto lower = _Lshl(_And(data, _Constant(lower_mask)), _Constant(63 - mantissa_bits));
 
     // XXX: Need to handle NaN/Infinities
-    constexpr size_t exponent_zero = (1 << (sign_bits-1));
+    constexpr size_t exponent_zero = (1 << (exponent_bits-1));
     auto adjusted_exponent = _Add(exponent, _Constant(0x4000 - exponent_zero));
     auto upper = _Or(sign, adjusted_exponent);
 
@@ -5071,15 +5072,87 @@ void OpDispatchBuilder::FLD(OpcodeArgs) {
   //_StoreContext(converted, 16, offsetof(FEXCore::Core::CPUState, mm[7][0]));
 }
 
+template<size_t width>
+void OpDispatchBuilder::FILD(OpcodeArgs) {
+  // Update TOP
+  auto orig_top = GetX87Top();
+  auto top = _And(_Sub(orig_top, _Constant(1)), _Constant(7));
+  SetX87Top(top);
+
+  size_t read_width = width / 8;
+
+  // Read from memory
+  auto data = LoadSource_WithOpSize(GPRClass, Op, Op->Src[0], read_width, Op->Flags, -1);
+
+  auto zero = _Constant(0);
+
+  // Sign extend to 64bits
+  if (width != 64)
+    data = _Sext(width, data);
+
+  // Extract sign and make interger absolute
+  auto sign = _Select(COND_SLT, data, zero, _Constant(0x8000), zero);
+  auto absolute =  _Select(COND_SLT, data, zero, _Sub(zero, data), data);
+
+  // left justify the absolute interger
+  auto shift = _Sub(_Constant(63), _FindMSB(absolute));
+  auto shifted = _Lshl(absolute, shift);
+
+  auto adjusted_exponent = _Sub(_Constant(0x3fff + 63), shift);
+  auto zeroed_exponent = _Select(COND_EQ, absolute, zero, zero, adjusted_exponent);
+  auto upper = _Or(sign, zeroed_exponent);
+
+
+  OrderedNode *converted = _VCastFromGPR(16, 8, shifted);
+  converted = _VInsElement(16, 8, 1, 0, converted, _VCastFromGPR(16, 8, upper));
+
+  // Write to ST[TOP]
+  _StoreContextIndexed(converted, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+}
+
+
 template<size_t width, bool pop>
 void OpDispatchBuilder::FST(OpcodeArgs) {
   auto orig_top = GetX87Top();
+  auto data = _LoadContextIndexed(orig_top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   if (width == 80) {
-    auto data = _LoadContextIndexed(orig_top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+    StoreResult_WithOpSize(FPRClass, Op, Op->Dest, data, 10, 1);
+  } else if (width == 32) {
+    // TODO: 64 bit
+
+    auto upper = _VExtractToGPR(16, 8, data, 1);
+
+    auto SignMask = _Constant(0x8000);
+    auto Sign = _And(upper, SignMask);
+    auto SignShift = _Constant(16);
+    auto SignShifted = _Lshl(Sign, SignShift);
+
+    auto ExponentMask = _Constant(0x7FFF);
+    OrderedNode *Exponent = _And(upper, ExponentMask);
+
+    auto ExpotentOffset = _Constant(0x3fff - 127);
+    Exponent = _Sub(Exponent, ExpotentOffset);
+
+    // Clamp to 0 to 255 range.
+    auto zero = _Constant(0);
+    Exponent = _Select(COND_SLT, Exponent, zero, zero, Exponent);
+    auto Max = _Constant(0xFF);
+    Exponent = _Select(COND_SGT, Exponent, Max, Max, Exponent);
+
+    // Fixme: This clamping code is nowhere near correct
+
+    auto ExponentShift = _Constant(23);
+    auto ExponentShifted = _Lshl(Exponent, ExponentShift);
+    auto Result = _Or(SignShifted, ExponentShifted);
+
+    auto MantissaMask = _Constant((1ULL << 63) - 1ULL);
+    auto Mantissa = _And(_VExtractToGPR(16, 8, data, 0), MantissaMask);
+    auto MantissaShift = _Constant(63 - 23);
+    auto MantissaShifted = _Lshr(Mantissa, MantissaShift);
+
+    Result = _Or(Result, MantissaShifted);
     StoreResult_WithOpSize(FPRClass, Op, Op->Dest, data, 10, 1);
   }
-
-  // TODO: Other widths
 
   if (pop) {
     auto top = _And(_Add(orig_top, _Constant(1)), _Constant(7));
@@ -5143,6 +5216,82 @@ void OpDispatchBuilder::FADD(OpcodeArgs) {
 
   auto lower = _VCastFromGPR(16, 8, MantissaAdjusted);
   auto upper = _VCastFromGPR(16, 8, ExponentAdjusted);
+
+  auto result = _VInsElement(16, 8, 1, 0, lower, upper);
+
+  if ((Op->TableInfo->Flags & X86Tables::InstFlags::FLAGS_POP) != 0) {
+    top = _And(_Add(top, one), mask);
+    SetX87Top(top);
+  }
+
+  // Write to ST[TOP]
+  _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+}
+
+void OpDispatchBuilder::FMUL(OpcodeArgs) {
+  auto top = GetX87Top();
+  OrderedNode* arg;
+
+  auto mask = _Constant(7);
+
+  if (Op->Src[0].TypeNone.Type != 0) {
+    // Memory arg
+    arg = LoadSource(GPRClass, Op, Op->Src[0], Op->Flags, -1);
+  } else {
+    // Implicit arg
+    auto offset = _Constant(Op->OP & 7);
+    arg = _And(_Add(top, offset), mask);
+  }
+
+  auto a = _LoadContextIndexed(top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  auto b = _LoadContextIndexed(arg, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+
+  // TODO: Sign
+
+  auto ExponentMask = _Constant(0x7FFF);
+  auto a_Exponent = _And(_VExtractToGPR(16, 8, a, 1), ExponentMask);
+  auto b_Exponent = _And(_VExtractToGPR(16, 8, b, 1), ExponentMask);
+
+  auto ZeroOffset = _Constant(0x3fff);
+
+  auto ExponentSummed = _Sub(_Add(a_Exponent, b_Exponent), ZeroOffset);
+
+  auto a_Mantissa = _VExtractToGPR(16, 8, a, 0);
+  auto b_Mantissa = _VExtractToGPR(16, 8, b, 0);
+
+  auto MantissaProductUpper = _UMulH(a_Mantissa, b_Mantissa);
+  auto MantissaProductLower = _Mul(a_Mantissa, b_Mantissa);
+
+  // _StoreContext(MantissaProductUpper, 8, offsetof(FEXCore::Core::CPUState, mm[0][0]));
+  // _StoreContext(MantissaProductLower, 8, offsetof(FEXCore::Core::CPUState, mm[1][0]));
+
+  // _StoreContext(a_Mantissa, 8, offsetof(FEXCore::Core::CPUState, mm[0][1]));
+  // _StoreContext(b_Mantissa, 8, offsetof(FEXCore::Core::CPUState, mm[1][1]));
+
+  // TODO: need special case for Upper == 0?
+
+  auto InverseShift = _FindMSB(MantissaProductUpper);
+  auto MantissaLowerShifted = _Lshr(MantissaProductLower, _Constant(63)); // Always shift lower by 63. Either we need the lower bit, or we will mask it off.
+
+  auto one = _Constant(1);
+  auto zero = _Constant(0);
+  auto Overflowed = _Constant(1ULL << 63);
+  auto Adjustment = _Select(COND_UGE, MantissaProductUpper, Overflowed, one, zero);
+  // TODO: need special case for when (ExponentSummed + Adjustment) is outsize of the 0x0000 to 0x7fff range.
+  auto ExponentAdjusted = _Add(ExponentSummed, Adjustment);
+  auto upper = _VCastFromGPR(16, 8, ExponentAdjusted);
+
+  auto Shift = _Xor(Adjustment, one); // Shift will either be 0 or 1.
+
+  // _StoreContext(Shift, 8, offsetof(FEXCore::Core::CPUState, mm[2][0]));
+  // _StoreContext(Adjustment, 8, offsetof(FEXCore::Core::CPUState, mm[2][1]));
+
+  auto MantissaShifted = _Lshl(MantissaProductUpper, Shift);
+  auto MantissaLowerMask = Shift; // Mask will either be 0 or 1.
+  auto MantissaLowerMasked = _And(MantissaLowerShifted, MantissaLowerMask);
+
+  auto Mantissa = _Or(MantissaShifted, MantissaLowerMasked);
+  auto lower = _VCastFromGPR(16, 8, Mantissa);
 
   auto result = _VInsElement(16, 8, 1, 0, lower, upper);
 
@@ -6123,6 +6272,14 @@ constexpr uint16_t PF_F2 = 3;
     {OPDReg(0xD9, 0) | 0x40, 8, &OpDispatchBuilder::FLD<32>},
     {OPDReg(0xD9, 0) | 0x80, 8, &OpDispatchBuilder::FLD<32>},
 
+    {OPDReg(0xD9, 2) | 0x00, 8, &OpDispatchBuilder::FST<32, false>},
+    {OPDReg(0xD9, 2) | 0x40, 8, &OpDispatchBuilder::FST<32, false>},
+    {OPDReg(0xD9, 2) | 0x80, 8, &OpDispatchBuilder::FST<32, false>},
+
+    {OPDReg(0xD9, 3) | 0x00, 8, &OpDispatchBuilder::FST<32, true>},
+    {OPDReg(0xD9, 3) | 0x40, 8, &OpDispatchBuilder::FST<32, true>},
+    {OPDReg(0xD9, 3) | 0x80, 8, &OpDispatchBuilder::FST<32, true>},
+
     {OPDReg(0xD9, 5) | 0x00, 8, &OpDispatchBuilder::NOPOp}, // XXX: stubbed FLDCW
     {OPDReg(0xD9, 5) | 0x40, 8, &OpDispatchBuilder::NOPOp}, // XXX: stubbed FLDCW
     {OPDReg(0xD9, 5) | 0x80, 8, &OpDispatchBuilder::NOPOp}, // XXX: stubbed FLDCW
@@ -6131,15 +6288,28 @@ constexpr uint16_t PF_F2 = 3;
     {OPDReg(0xD9, 7) | 0x40, 8, &OpDispatchBuilder::NOPOp}, // XXX: stubbed FNSTCW
     {OPDReg(0xD9, 7) | 0x80, 8, &OpDispatchBuilder::NOPOp}, // XXX: stubbed FNSTCW
 
+    {OPDReg(0xDB, 0) | 0x00, 8, &OpDispatchBuilder::FILD<32>},
+    {OPDReg(0xDB, 0) | 0x40, 8, &OpDispatchBuilder::FILD<32>},
+    {OPDReg(0xDB, 0) | 0x80, 8, &OpDispatchBuilder::FILD<32>},
+
     {OPDReg(0xDB, 7) | 0x00, 8, &OpDispatchBuilder::FST<80, true>},
     {OPDReg(0xDB, 7) | 0x40, 8, &OpDispatchBuilder::FST<80, true>},
     {OPDReg(0xDB, 7) | 0x80, 8, &OpDispatchBuilder::FST<80, true>},
+
+    {OPDReg(0xDF, 0) | 0x00, 8, &OpDispatchBuilder::FILD<16>},
+    {OPDReg(0xDF, 0) | 0x40, 8, &OpDispatchBuilder::FILD<16>},
+    {OPDReg(0xDF, 0) | 0x80, 8, &OpDispatchBuilder::FILD<16>},
+
+    {OPDReg(0xDF, 5) | 0x00, 8, &OpDispatchBuilder::FILD<64>},
+    {OPDReg(0xDF, 5) | 0x40, 8, &OpDispatchBuilder::FILD<64>},
+    {OPDReg(0xDF, 5) | 0x80, 8, &OpDispatchBuilder::FILD<64>},
 
     {OPDReg(0xDD, 0) | 0x00, 8, &OpDispatchBuilder::FLD<64>},
     {OPDReg(0xDD, 0) | 0x40, 8, &OpDispatchBuilder::FLD<64>},
     {OPDReg(0xDD, 0) | 0x80, 8, &OpDispatchBuilder::FLD<64>},
 
     {OPD(0xDE, 0xC0), 8, &OpDispatchBuilder::FADD},
+    {OPD(0xDE, 0xC8), 8, &OpDispatchBuilder::FMUL}
   };
 #undef OPD
 #undef OPDReg

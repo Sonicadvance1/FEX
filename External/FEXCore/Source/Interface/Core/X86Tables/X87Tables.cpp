@@ -35,7 +35,7 @@ void InitializeX87Tables() {
     // 0xD9
     {OPDReg(0xD9, 0), 1, X86InstInfo{"FLD",     TYPE_INST, FLAGS_MODRM, 0, nullptr}},
     {OPDReg(0xD9, 1), 1, X86InstInfo{"",        TYPE_INVALID, FLAGS_NONE, 0, nullptr}},
-    {OPDReg(0xD9, 2), 1, X86InstInfo{"FST",     TYPE_X87, FLAGS_NONE, 0, nullptr}},
+    {OPDReg(0xD9, 2), 1, X86InstInfo{"FST",     TYPE_X87, FLAGS_MODRM | FLAGS_SF_MOD_DST, 0, nullptr}},
     {OPDReg(0xD9, 3), 1, X86InstInfo{"FSTP",    TYPE_X87, FLAGS_MODRM | FLAGS_SF_MOD_DST, 0, nullptr}},
     {OPDReg(0xD9, 4), 1, X86InstInfo{"FLDENV",  TYPE_X87, FLAGS_MODRM, 0, nullptr}},
     {OPDReg(0xD9, 5), 1, X86InstInfo{"FLDCW",   TYPE_X87, FLAGS_NONE, 0, nullptr}},
