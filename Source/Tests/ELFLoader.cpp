@@ -112,7 +112,7 @@ int main(int argc, char **argv, char **const envp) {
   FEX::HarnessHelper::ELFCodeLoader Loader{Args[0], LDPath(), Args, ParsedArgs, envp};
 
   FEXCore::Context::InitializeStaticTables(Loader.Is64BitMode() ? FEXCore::Context::MODE_64BIT : FEXCore::Context::MODE_32BIT);
-  uint64_t VMemSize = 1ULL << 36;
+  uint64_t VMemSize = 1ULL << 33;
   if (!Loader.Is64BitMode()) {
     VMemSize = 1ULL << 32;
   }

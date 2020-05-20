@@ -17,11 +17,11 @@ void PassManager::AddDefaultPasses() {
 }
 
 void PassManager::AddDefaultValidationPasses() {
-#ifndef NDEBUG
-  InsertValidationPass(Validation::CreatePhiValidation());
-  InsertValidationPass(Validation::CreateIRValidation());
-  InsertValidationPass(Validation::CreateValueDominanceValidation());
-#endif
+//#ifndef NDEBUG
+//  InsertValidationPass(Validation::CreatePhiValidation());
+//  InsertValidationPass(Validation::CreateIRValidation());
+//  InsertValidationPass(Validation::CreateValueDominanceValidation());
+//#endif
 }
 
 bool PassManager::Run(IREmitter *IREmit) {

@@ -357,7 +357,7 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
   LogMan::Throw::A(HeaderOp->Header.Op == IR::OP_IRHEADER, "First op wasn't IRHeader");
 
   if (HeaderOp->ShouldInterpret) {
-    return ThreadState->IntBackend->CompileCode(IR, DebugData);
+    return State->IntBackend->CompileCode(IR, DebugData);
   }
 
   LogMan::Throw::A(RAPass->HasFullRA(), "Arm64 JIT only works with RA");
@@ -4161,7 +4161,6 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
             break;
           case 1:
             dsb(FullSystem, BarrierAll);
-            mfence();
             break;
           case 2:
             dsb(FullSystem, BarrierWrites);
@@ -4203,7 +4202,6 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
   }
 #endif
 
-  LogMan::Msg::D("RIP: %p disas %p,%p", HeaderOp->Entry, Entry, CodeEnd);
   return reinterpret_cast<void*>(Entry);
 }
 

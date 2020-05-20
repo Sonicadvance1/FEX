@@ -23,7 +23,8 @@ struct InternalThreadState;
 
 namespace FEXCore::HLE {
   uint64_t Getpid(FEXCore::Core::InternalThreadState *Thread) {
-    uint64_t Result = ::getpid();
+    //uint64_t Result = ::getpid();
+    uint64_t Result = Thread->CTX->ParentThread->State.ThreadManager.GetTID();
     SYSCALL_ERRNO();
   }
 
