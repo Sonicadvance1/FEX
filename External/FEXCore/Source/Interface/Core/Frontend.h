@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <utility>
+#include <unordered_set>
 #include <set>
 #include <stack>
 #include <vector>
@@ -65,7 +66,7 @@ private:
   uint64_t SymbolMinAddress {~0ULL};
 
   std::vector<DecodedBlocks> Blocks;
-  std::set<uint64_t> BlocksToDecode;
-  std::set<uint64_t> HasBlocks;
+  std::unordered_set<uint64_t> BlocksToDecode;
+  std::unordered_set<uint64_t> HasBlocks;
 };
 }
