@@ -4484,6 +4484,23 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
           }
           break;
         }
+        case IR::OP_FENCE: {
+          auto Op = IROp->C<IR::IROp_Fence>();
+          switch (Op->FenceType) {
+            case 0:
+              lfence();
+              break;
+            case 1:
+              mfence();
+              break;
+            case 2:
+              sfence();
+              break;
+            default: LogMan::Msg::A("Unknown Fence: %d", Op->FenceType); break;
+          }
+          break;
+        }
+
         case IR::OP_DUMMY:
         case IR::OP_IRHEADER:
         case IR::OP_PHIVALUE:
