@@ -191,6 +191,22 @@ struct X80SoftFloat {
     memcpy(this, &rhs, sizeof(*this));
   }
 
+  X80SoftFloat(const float rhs) {
+    *this = f32_to_extF80(*(float32_t*)&rhs);
+  }
+
+  X80SoftFloat(const double rhs) {
+    *this = f64_to_extF80(*(float64_t*)&rhs);
+  }
+
+  X80SoftFloat(const int16_t rhs) {
+    *this = i32_to_extF80(rhs);
+  }
+
+  X80SoftFloat(const int32_t rhs) {
+    *this = i32_to_extF80(rhs);
+  }
+
   void operator=(extFloat80_t rhs) {
     memcpy(this, &rhs, sizeof(*this));
   }
