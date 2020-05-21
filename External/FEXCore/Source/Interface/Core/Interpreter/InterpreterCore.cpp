@@ -1,5 +1,6 @@
 #include "LogManager.h"
 #include "Common/MathUtils.h"
+#include "Common/SoftFloat.h"
 #include "Interface/Context/Context.h"
 #include "Interface/Core/DebugData.h"
 #include "Interface/Core/InternalThreadState.h"
@@ -253,14 +254,6 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
               uint64_t Src1 = Src >> 64;
               LogMan::Msg::I(">>>> Value[0] in Arg: 0x%lx, %ld", Src0, Src0);
               LogMan::Msg::I("     Value[1] in Arg: 0x%lx, %ld", Src1, Src1);
-
-              union {
-                __uint128_t i;
-                long double f;
-              } Val;
-              Val.i = Src;
-              LogMan::Msg::I("Value long double = %Lf 0x%Lx%Lx", Val.f, Src1, Src0);
-
             }
             else
               LogMan::Msg::A("Unknown value size: %d", OpSize);
@@ -3927,97 +3920,97 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
           }
           case IR::OP_F80ADD: {
             auto Op = IROp->C<IR::IROp_F80Add>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src1 + Src2;
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FADD(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80SUB: {
             auto Op = IROp->C<IR::IROp_F80Sub>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src1 - Src2;
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FSUB(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80MUL: {
             auto Op = IROp->C<IR::IROp_F80Mul>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src1 * Src2;
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FMUL(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80DIV: {
             auto Op = IROp->C<IR::IROp_F80Div>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src1 / Src2;
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FDIV(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80FYL2X: {
             auto Op = IROp->C<IR::IROp_F80FYL2X>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src2 * log2l(Src1);
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FYL2X(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80ATAN: {
             auto Op = IROp->C<IR::IROp_F80ATAN>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = atan2l(Src1, Src2);
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FATAN(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80FPREM1: {
             auto Op = IROp->C<IR::IROp_F80FPREM1>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = remainderl(Src1, Src2);
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FREM1(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80FPREM: {
             auto Op = IROp->C<IR::IROp_F80FPREM>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = fmodl(Src1, Src2);
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FREM(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80SCALE: {
             auto Op = IROp->C<IR::IROp_F80SCALE>();
-            long double Src1 = *GetSrc<long double *>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double *>(Op->Header.Args[1]);
-            long double Tmp;
-            Tmp = Src1 * exp2l(truncl(Src2));
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FSCALE(Src1, Src2);
 
-            memcpy(GDP, &Tmp, 10);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80CVT: {
             auto Op = IROp->C<IR::IROp_F80CVT>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
 
             switch (OpSize) {
               case 4: {
@@ -4036,8 +4029,7 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
           }
           case IR::OP_F80CVTINT: {
             auto Op = IROp->C<IR::IROp_F80CVTInt>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = rintl(Src);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
 
             switch (OpSize) {
               case 2: {
@@ -4065,14 +4057,14 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             switch (Op->Size) {
               case 4: {
                 float Src = *GetSrc<float *>(Op->Header.Args[0]);
-                long double Tmp = Src;
-                memcpy(GDP, &Tmp, 10);
+                X80SoftFloat Tmp = Src;
+                memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
                 break;
               }
               case 8: {
                 double Src = *GetSrc<double *>(Op->Header.Args[0]);
-                long double Tmp = Src;
-                memcpy(GDP, &Tmp, 10);
+                X80SoftFloat Tmp = Src;
+                memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
                 break;
               }
             default: LogMan::Msg::D("Unhandled size: %d", OpSize);
@@ -4085,14 +4077,14 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             switch (Op->Size) {
               case 2: {
                 int16_t Src = *GetSrc<int16_t*>(Op->Header.Args[0]);
-                long double Tmp = Src;
-                memcpy(GDP, &Tmp, 10);
+                X80SoftFloat Tmp = Src;
+                memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
                 break;
               }
               case 4: {
                 int32_t Src = *GetSrc<int32_t*>(Op->Header.Args[0]);
-                long double Tmp = Src;
-                memcpy(GDP, &Tmp, 10);
+                X80SoftFloat Tmp = Src;
+                memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
                 break;
               }
             default: LogMan::Msg::D("Unhandled size: %d", OpSize);
@@ -4101,92 +4093,90 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
           }
           case IR::OP_F80ROUND: {
             auto Op = IROp->C<IR::IROp_F80Round>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = rintl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FRNDINT(Src);
+
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80F2XM1: {
             auto Op = IROp->C<IR::IROp_F80F2XM1>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = exp2l(Src) - 1.0;
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::F2XM1(Src);
+
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80TAN: {
             auto Op = IROp->C<IR::IROp_F80TAN>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = tanl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FTAN(Src);
+
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80SQRT: {
             auto Op = IROp->C<IR::IROp_F80SQRT>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = sqrtl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FSQRT(Src);
+
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80SIN: {
             auto Op = IROp->C<IR::IROp_F80SIN>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = sinl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FSIN(Src);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80COS: {
             auto Op = IROp->C<IR::IROp_F80COS>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = cosl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FCOS(Src);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80XTRACT_EXP: {
             auto Op = IROp->C<IR::IROp_F80XTRACT_EXP>();
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            Src = logbl(Src);
-            memcpy(GDP, &Src, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FXTRACT_EXP(Src);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
           case IR::OP_F80XTRACT_SIG: {
             auto Op = IROp->C<IR::IROp_F80XTRACT_SIG>();
-            union PackedLDouble {
-              long double f;
-              struct {
-                uint64_t Significand;
-                uint32_t Exp : 15;
-                uint32_t Sign : 1;
-              } Packed;
-            };
-            PackedLDouble Result;
-            long double Src = *GetSrc<long double *>(Op->Header.Args[0]);
-            int Tmp;
-            Result.f = frexpl(Src, &Tmp);
-            Result.Packed.Exp = 0x3FFF;
-            Result.Packed.Sign = std::signbit(Src);
-            memcpy(GDP, &Result, 10);
+            X80SoftFloat Src = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Tmp;
+            Tmp = X80SoftFloat::FXTRACT_SIG(Src);
+            memcpy(GDP, &Tmp, sizeof(X80SoftFloat));
             break;
           }
-
           case IR::OP_F80CMP: {
             auto Op = IROp->C<IR::IROp_F80Cmp>();
             uint32_t ResultFlags{};
-            long double Src1 = *GetSrc<long double*>(Op->Header.Args[0]);
-            long double Src2 = *GetSrc<long double*>(Op->Header.Args[1]);
-            if (Op->Flags & (1 << FCMP_FLAG_LT)) {
-              if (Src1 < Src2) {
-                ResultFlags |= (1 << FCMP_FLAG_LT);
-              }
+            X80SoftFloat Src1 = *GetSrc<X80SoftFloat*>(Op->Header.Args[0]);
+            X80SoftFloat Src2 = *GetSrc<X80SoftFloat*>(Op->Header.Args[1]);
+            bool eq, lt, nan;
+            X80SoftFloat::FCMP(Src1, Src2, &eq, &lt, &nan);
+            if (Op->Flags & (1 << FCMP_FLAG_LT) &&
+                lt) {
+              ResultFlags |= (1 << FCMP_FLAG_LT);
             }
-            if (Op->Flags & (1 << FCMP_FLAG_UNORDERED)) {
-              if (std::isnan(Src1) || std::isnan(Src2)) {
-                ResultFlags |= (1 << FCMP_FLAG_UNORDERED);
-              }
+            if (Op->Flags & (1 << FCMP_FLAG_UNORDERED) &&
+                nan) {
+              ResultFlags |= (1 << FCMP_FLAG_UNORDERED);
             }
-            if (Op->Flags & (1 << FCMP_FLAG_EQ)) {
-              if (Src1 == Src2) {
-                ResultFlags |= (1 << FCMP_FLAG_EQ);
-              }
+            if (Op->Flags & (1 << FCMP_FLAG_EQ) &&
+                eq) {
+              ResultFlags |= (1 << FCMP_FLAG_EQ);
             }
 
             GD = ResultFlags;
