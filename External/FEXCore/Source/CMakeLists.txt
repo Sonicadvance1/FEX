@@ -104,6 +104,7 @@ set (SRCS
   Common/SoftFloat-3e/s_countLeadingZeros8.c
   Common/SoftFloat-3e/s_countLeadingZeros32.c
   Common/SoftFloat-3e/s_countLeadingZeros64.c
+  Common/SoftFloat-3e/f32_to_extF80.c
   Interface/Config/Config.cpp
   Interface/Context/Context.cpp
   Interface/Core/BlockCache.cpp
