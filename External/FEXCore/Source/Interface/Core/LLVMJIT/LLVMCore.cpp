@@ -19,7 +19,7 @@
  #include <llvm/IR/IntrinsicsX86.h>
 #endif
 
-#if defined(_M_ARM_64)
+#if defined(_M_ARM_64) && __has_include (<llvm/IR/IntrinsicsAArch64.h>)
 #include <llvm/IR/IntrinsicsAArch64.h>
 #endif
 
