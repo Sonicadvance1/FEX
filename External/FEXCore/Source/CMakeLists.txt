@@ -63,6 +63,12 @@ set (SRCS
   Common/SoftFloat-3e/extF80_to_f32.c
   Common/SoftFloat-3e/extF80_to_f64.c
   Common/SoftFloat-3e/i32_to_extF80.c
+  Common/SoftFloat-3e/extF80_to_f128.c
+  Common/SoftFloat-3e/f128_to_extF80.c
+  Common/SoftFloat-3e/s_f128UIToCommonNaN.c
+  Common/SoftFloat-3e/s_commonNaNToF128UI.c
+  Common/SoftFloat-3e/s_shortShiftRight128.c
+  Common/SoftFloat-3e/s_normSubnormalF128Sig.c
   Common/SoftFloat-3e/s_roundToI32.c
   Common/SoftFloat-3e/s_roundToI64.c
   Common/SoftFloat-3e/s_roundPackToF32.c

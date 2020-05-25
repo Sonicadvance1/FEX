@@ -11,6 +11,13 @@ extern "C" {
 }
 
 struct X80SoftFloat {
+#ifdef _M_X86_64
+#define BIGFLOAT __float128
+#elif defined(_M_ARM_64)
+#define BIGFLOAT long double
+#else
+#error No 128bit float for this target!
+#endif
   struct __attribute__((packed)) {
     uint64_t Significand : 64;
     uint16_t Exponent    : 15;
@@ -25,7 +32,7 @@ struct X80SoftFloat {
     {
   }
 
-  std::string str() {
+  std::string str() const {
     std::ostringstream string;
     string << std::hex << Sign;
     string << "_" << Exponent;
@@ -51,70 +58,24 @@ struct X80SoftFloat {
     return extF80_div(lhs, rhs);
   }
 
-  static X80SoftFloat FATAN(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
-    double Src1_d = lhs;
-    double Src2_d = rhs;
-    double Tmp = atan2(Src1_d, Src2_d);
-    return Tmp;
-  }
-
   static X80SoftFloat FREM(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
-    return extF80_rem(lhs, rhs);
+    X80SoftFloat Rem = extF80_rem(lhs, rhs);
+    if (SignBit(Rem)) {
+      Rem = extF80_add(Rem, rhs);
+    }
+    else {
+      Rem.Sign = SignBit(lhs);
+    }
+
+    return Rem;
   }
 
   static X80SoftFloat FREM1(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
     return extF80_rem(lhs, rhs);
   }
 
-  static X80SoftFloat FSCALE(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
-    double Src1_d = lhs;
-    double Src2_d = rhs;
-    double Tmp = Src1_d * exp2(trunc(Src2_d));
-    return Tmp;
-  }
-
   static X80SoftFloat FRNDINT(X80SoftFloat const &lhs) {
     return extF80_roundToInt(lhs, softfloat_round_near_even, false);
-  }
-
-  static X80SoftFloat F2XM1(X80SoftFloat const &lhs) {
-    double Src_d = lhs;
-    Src_d = exp2(Src_d) - 1.0;
-    return Src_d;
-  }
-
-  static X80SoftFloat FYL2X(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
-    double Src1_d = lhs;
-    double Src2_d = rhs;
-    double Tmp = Src2_d * log2l(Src1_d);
-    return Tmp;
-  }
-
-  static X80SoftFloat FTAN(X80SoftFloat const &lhs) {
-    double Src_d = lhs;
-    Src_d = tan(Src_d);
-    return Src_d;
-  }
-
-  static X80SoftFloat FSQRT(X80SoftFloat const &lhs) {
-    return extF80_sqrt(lhs);
-  }
-
-  static X80SoftFloat FSIN(X80SoftFloat const &lhs) {
-    double Src_d = lhs;
-    Src_d = sin(Src_d);
-    return Src_d;
-  }
-
-  static X80SoftFloat FCOS(X80SoftFloat const &lhs) {
-    double Src_d = lhs;
-    Src_d = cos(Src_d);
-    return Src_d;
-  }
-
-  static X80SoftFloat FXTRACT_EXP(X80SoftFloat const &lhs) {
-    int32_t TrueExp = lhs.Exponent - ExponentBias;
-    return i32_to_extF80(TrueExp);
   }
 
   static X80SoftFloat FXTRACT_SIG(X80SoftFloat const &lhs) {
@@ -124,10 +85,65 @@ struct X80SoftFloat {
     return Tmp;
   }
 
+  static X80SoftFloat FXTRACT_EXP(X80SoftFloat const &lhs) {
+    int32_t TrueExp = lhs.Exponent - ExponentBias;
+    return i32_to_extF80(TrueExp);
+  }
+
   static void FCMP(X80SoftFloat const &lhs, X80SoftFloat const &rhs, bool *eq, bool *lt, bool *nan) {
     *eq = extF80_eq(lhs, rhs);
     *lt = extF80_lt(lhs, rhs);
     *nan = IsNan(lhs) || IsNan(rhs);
+  }
+
+  static X80SoftFloat FSCALE(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
+    X80SoftFloat Int = FRNDINT(rhs);
+    BIGFLOAT Src2_d = Int;
+    Src2_d = exp2l(Src2_d);
+    X80SoftFloat Src2_X80 = Src2_d;
+    X80SoftFloat Result = extF80_mul(lhs, Src2_X80);
+    return Result;
+  }
+
+  static X80SoftFloat F2XM1(X80SoftFloat const &lhs) {
+    BIGFLOAT Src1_d = lhs;
+    return exp2l(Src1_d) - 1.0;
+  }
+
+  static X80SoftFloat FYL2X(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
+    BIGFLOAT Src1_d = lhs;
+    BIGFLOAT Src2_d = rhs;
+    BIGFLOAT Tmp = Src2_d * log2l(Src1_d);
+    return Tmp;
+  }
+
+  static X80SoftFloat FATAN(X80SoftFloat const &lhs, X80SoftFloat const &rhs) {
+    BIGFLOAT Src1_d = lhs;
+    BIGFLOAT Src2_d = rhs;
+    BIGFLOAT Tmp = atan2l(Src1_d, Src2_d);
+    return Tmp;
+  }
+
+  static X80SoftFloat FTAN(X80SoftFloat const &lhs) {
+    BIGFLOAT Src_d = lhs;
+    Src_d = tanl(Src_d);
+    return Src_d;
+  }
+
+  static X80SoftFloat FSIN(X80SoftFloat const &lhs) {
+    BIGFLOAT Src_d = lhs;
+    Src_d = sinl(Src_d);
+    return Src_d;
+  }
+
+  static X80SoftFloat FCOS(X80SoftFloat const &lhs) {
+    BIGFLOAT Src_d = lhs;
+    Src_d = cosl(Src_d);
+    return Src_d;
+  }
+
+  static X80SoftFloat FSQRT(X80SoftFloat const &lhs) {
+    return extF80_sqrt(lhs);
   }
 
   operator float() const {
@@ -138,6 +154,11 @@ struct X80SoftFloat {
   operator double() const {
     float64_t Result = extF80_to_f64(*this);
     return *(double*)&Result;
+  }
+
+  operator BIGFLOAT() const {
+    float128_t Result = extF80_to_f128(*this);
+    return *(BIGFLOAT*)&Result;
   }
 
   operator int16_t() const {
@@ -199,6 +220,10 @@ struct X80SoftFloat {
     *this = f64_to_extF80(*(float64_t*)&rhs);
   }
 
+  X80SoftFloat(BIGFLOAT rhs) {
+    *this = f128_to_extF80(*(float128_t*)&rhs);
+  }
+
   X80SoftFloat(const int16_t rhs) {
     *this = i32_to_extF80(rhs);
   }
@@ -219,6 +244,10 @@ struct X80SoftFloat {
     return (lhs.Exponent == 0x7FFF) &&
       (lhs.Significand & IntegerBit) &&
       (lhs.Significand & Bottom62Significand);
+  }
+
+  static bool SignBit(X80SoftFloat const &lhs) {
+    return lhs.Sign;
   }
 
 private:
