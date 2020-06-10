@@ -94,7 +94,7 @@ ELFSymbolDatabase::~ELFSymbolDatabase() {
 }
 
 void ELFSymbolDatabase::FillMemoryLayouts() {
-  uint64_t ELFBases = 0x1'0000'0000;
+  uint64_t ELFBases = 0x100'0000;
   // We can only relocate the passed in ELF if it is dynamic
   // If it is EXEC then it HAS to end up in the base offset it chose
   if (LocalInfo.Container->WasDynamic()) {
@@ -111,7 +111,7 @@ void ELFSymbolDatabase::FillMemoryLayouts() {
     std::get<2>(LocalInfo.CustomLayout) = CurrentELFAlignedSize;
     LocalInfo.GuestBase = ELFBases;
 
-    ELFBases += AlignUp(CurrentELFAlignedSize, 0x1'0000'0000);
+    ELFBases += AlignUp(CurrentELFAlignedSize, 0x1000);
   }
   else {
     LocalInfo.CustomLayout = File->GetLayout();
@@ -142,7 +142,7 @@ void ELFSymbolDatabase::FillMemoryLayouts() {
     DynamicELFInfo[i]->CustomLayout = Layout;
     DynamicELFInfo[i]->GuestBase = ELFBases;
 
-    ELFBases += AlignUp(CurrentELFAlignedSize, 0x1'0000'0000);
+    ELFBases += AlignUp(CurrentELFAlignedSize, 0x1000);
   }
 }
 
@@ -277,7 +277,14 @@ void ELFSymbolDatabase::HandleRelocations() {
 }
 
 uint64_t ELFSymbolDatabase::DefaultRIP() const {
-  return File->GetEntryPoint() + std::get<0>(LocalInfo.CustomLayout);
+  if (LocalInfo.Container->WasDynamic()) {
+    //LogMan::Msg::D("Dynamic DefaultRIP: 0x%lx + 0x%lx = 0x%lx", File->GetEntryPoint(), std::get<0>(LocalInfo.CustomLayout), File->GetEntryPoint() + std::get<0>(LocalInfo.CustomLayout));
+    return File->GetEntryPoint() + std::get<0>(LocalInfo.CustomLayout);
+  }
+  else {
+    //LogMan::Msg::D("DefaultRIP: 0x%lx", File->GetEntryPoint());
+    return File->GetEntryPoint();
+  }
 }
 
 ELFSymbol const *ELFSymbolDatabase::GetSymbolInRange(RangeType Address) {

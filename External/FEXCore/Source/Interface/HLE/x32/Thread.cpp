@@ -3,6 +3,8 @@
 #include "Interface/HLE/Syscalls.h"
 #include "Interface/HLE/x32/Thread.h"
 
+
+#include <asm/ldt.h>
 #include <stdint.h>
 
 namespace FEXCore::HLE::x32 {

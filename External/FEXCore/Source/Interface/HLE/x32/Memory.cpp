@@ -20,7 +20,7 @@ namespace FEXCore::HLE::x32 {
 
 #ifdef MEM_PASSTHROUGH
     if (!(flags & MAP_FIXED)) {
-      uint64_t Result = reinterpret_cast<uint64_t>(::mmap(addr, length, prot, flags, fd, offset));
+      uint64_t Result = reinterpret_cast<uint64_t>(::mmap(addr, length, prot, flags | MAP_32BIT, fd, offset));
       SYSCALL_ERRNO();
     }
     else {
@@ -43,7 +43,7 @@ namespace FEXCore::HLE::x32 {
       return -ENOMEM;
     }
 #else
-    return Thread->CTX->SyscallHandler->HandleMMAP(Thread, addr, length, prot, flags, fd, offset);
+    return Thread->CTX->SyscallHandler->HandleMMAP(Thread, addr, length, prot, flags | MAP_32BIT, fd, offset);
 #endif
   }
 

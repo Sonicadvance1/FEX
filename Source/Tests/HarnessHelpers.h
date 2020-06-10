@@ -9,6 +9,7 @@
 #include <bitset>
 #include <cassert>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 #include <FEXCore/Core/CodeLoader.h>
@@ -383,7 +384,8 @@ public:
   ELFCodeLoader(std::string const &Filename, std::string const &RootFS, [[maybe_unused]] std::vector<std::string> const &args, std::vector<std::string> const &ParsedArgs, char **const envp = nullptr)
     : File {Filename, RootFS, false}
     , DB {&File}
-    , Args {args} {
+    , Args {args}
+    , Filename {Filename} {
 
     if (File.HasDynamicLinker()) {
       // If the file isn't static then we need to add the filename of interpreter
@@ -409,23 +411,32 @@ public:
       EnvironmentBackingSize += EnvironmentVariables[i].size() + 1;
     }
 
-    AuxVariables.emplace_back(auxv_t{4, 0x38}); // AT_PHENT
-    AuxVariables.emplace_back(auxv_t{5, 0xb}); // XXX: AT_PHNUM
+    AuxVariables.emplace_back(auxv_t{4, 20}); // AT_PHENT
+    AuxVariables.emplace_back(auxv_t{5, 0x9}); // XXX: AT_PHNUM
     AuxVariables.emplace_back(auxv_t{6, 0x1000}); // AT_PAGESIZE
     AuxVariables.emplace_back(auxv_t{8, 0}); // AT_FLAGS
     AuxVariables.emplace_back(auxv_t{11, 1000}); // AT_UID
     AuxVariables.emplace_back(auxv_t{12, 1000}); // AT_EUID
     AuxVariables.emplace_back(auxv_t{13, 1000}); // AT_GID
     AuxVariables.emplace_back(auxv_t{14, 1000}); // AT_EGID
-    AuxVariables.emplace_back(auxv_t{16, 0}); // AT_HWCAP
+    AuxVariables.emplace_back(auxv_t{16, 0x178bfbff}); // AT_HWCAP
     AuxVariables.emplace_back(auxv_t{17, 0x64}); // AT_CLKTIK
     AuxVariables.emplace_back(auxv_t{23, 0}); // AT_SECURE
 
-    //AuxVariables.emplace_back(auxv_t{24, ~0ULL}); // AT_PLATFORM
+    AuxVariables.emplace_back(auxv_t{15, ~0U}); // AT_PLATFORM
+    AuxVariables.emplace_back(auxv_t{31, ~0U}); // EXECFN
+
+    //AuxVariables.emplace_back(auxv_t{24, 2}); // AT_BASE_PLATFORM
     AuxVariables.emplace_back(auxv_t{25, ~0ULL}); // AT_RANDOM
-    //AuxVariables.emplace_back(auxv_t{26, 0}); // AT_HWCAP2
-    AuxVariables.emplace_back(auxv_t{32, 0ULL}); // sysinfo (vDSO)
-    AuxVariables.emplace_back(auxv_t{33, 0ULL}); // sysinfo (vDSO)
+    AuxVariables.emplace_back(auxv_t{26, 0}); // AT_HWCAP2
+    if (File.GetMode() == ELFLoader::ELFContainer::MODE_32BIT) {
+      AuxVariables.emplace_back(auxv_t{32, 0xFFFF'D150}); // sysinfo (vDSO)
+      AuxVariables.emplace_back(auxv_t{33, 0xFFFF'C000}); // sysinfo_ehdr (vDSO)
+    }
+    else {
+      AuxVariables.emplace_back(auxv_t{32, 0ULL}); // sysinfo (vDSO)
+      AuxVariables.emplace_back(auxv_t{33, 0ULL}); // sysinfo (vDSO)
+    }
 
     for (auto &Arg : ParsedArgs) {
       LoaderArgs.emplace_back(Arg.c_str());
@@ -437,35 +448,43 @@ public:
   }
 
   virtual void SetMemoryBase(uint64_t Base, bool Unified) override {
-    if (File.WasDynamic() && Unified) {
+    //LogMan::Msg::D("Mem Base: 0x%lx", Base);
+    if (Is64BitMode() && File.WasDynamic() && Unified) {
       MemoryBase = Base;
     }
     else {
-      MemoryBase = 0;
+      MemoryBase = 0x100'0000;
     }
     // Set up our aux values here
 
     AuxVariables.emplace_back(auxv_t{3, MemoryBase}); // Program header
-    AuxVariables.emplace_back(auxv_t{7, MemoryBase}); // Interpreter address
-    AuxVariables.emplace_back(auxv_t{9, MemoryBase + DB.DefaultRIP()}); // AT_ENTRY
+    AuxVariables.emplace_back(auxv_t{7, DB.DefaultRIP()}); // Interpreter address
+    AuxVariables.emplace_back(auxv_t{9, DB.DefaultRIP()}); // AT_ENTRY
     AuxVariables.emplace_back(auxv_t{0, 0}); // Null ender
   }
 
   uint64_t SetupStack(void *HostPtr, uint64_t GuestPtr) const override {
+    uint32_t PtrSize = File.GetMode() == ELFLoader::ELFContainer::MODE_32BIT ? 4 : 8;
+
     uintptr_t StackPointer = reinterpret_cast<uintptr_t>(HostPtr) + StackSize();
     // Set up our initial CPU state
     uint64_t rsp = GuestPtr + StackSize();
 
     uint64_t TotalArgumentMemSize{};
 
-    TotalArgumentMemSize += 8; // Argument counter size
-    TotalArgumentMemSize += 8 * Args.size(); // Pointers to strings
-    TotalArgumentMemSize += 8; // Padding for something
-    TotalArgumentMemSize += 8 * EnvironmentVariables.size(); // Argument location for envp
-    TotalArgumentMemSize += 8; // envp nullptr ender
+    TotalArgumentMemSize += PtrSize; // Argument counter size
+    TotalArgumentMemSize += PtrSize * Args.size(); // Pointers to strings
+    TotalArgumentMemSize += PtrSize; // Just a nullptr spot
+    TotalArgumentMemSize += PtrSize * EnvironmentVariables.size(); // Argument location for envp
+    TotalArgumentMemSize += PtrSize; // envp nullptr ender
 
     uint64_t AuxVOffset = TotalArgumentMemSize;
-    TotalArgumentMemSize += sizeof(auxv_t) * AuxVariables.size();
+    if (File.GetMode() == ELFLoader::ELFContainer::MODE_32BIT) {
+      TotalArgumentMemSize += sizeof(auxv32_t) * AuxVariables.size();
+    }
+    else {
+      TotalArgumentMemSize += sizeof(auxv_t) * AuxVariables.size();
+    }
 
     uint64_t ArgumentOffset = TotalArgumentMemSize;
     TotalArgumentMemSize += ArgumentBackingSize;
@@ -475,7 +494,13 @@ public:
 
     // Random number location
     uint64_t RandomNumberLocation = TotalArgumentMemSize;
-    TotalArgumentMemSize += 16;
+    TotalArgumentMemSize += 16; // AT_RANDOM is a fixed 16 bytes
+
+    uint64_t PlatformStringLocation = TotalArgumentMemSize;
+    TotalArgumentMemSize += 8; // Max string length of 8 bytes for us
+
+    uint64_t ExecutableStringLocation = TotalArgumentMemSize;
+    TotalArgumentMemSize += std::filesystem::canonical(Filename).u8string().size() + 1;
 
     // Offset the stack by how much memory we need
     rsp -= TotalArgumentMemSize;
@@ -496,10 +521,10 @@ public:
     // [envpend, +8): nullptr
 
     // Pointer list offsets
-    uint64_t *ArgumentPointers = reinterpret_cast<uint64_t*>(StackPointer + 8);
-    uint64_t *PadPointers = reinterpret_cast<uint64_t*>(StackPointer + 8 + Args.size() * 8);
-    uint64_t *EnvpPointers = reinterpret_cast<uint64_t*>(StackPointer + 8 + Args.size() * 8 + 8);
-    auxv_t *AuxVPointers = reinterpret_cast<auxv_t*>(StackPointer + AuxVOffset);
+    void *ArgumentPointers = reinterpret_cast<void*>(StackPointer + PtrSize);
+    void *PadPointers      = reinterpret_cast<void*>(StackPointer + PtrSize + Args.size() * PtrSize);
+    void *EnvpPointers     = reinterpret_cast<void*>(StackPointer + PtrSize + Args.size() * PtrSize + PtrSize);
+    void *AuxVPointers     = reinterpret_cast<void*>(StackPointer + AuxVOffset);
 
     // Arguments memory lives after everything else
     uint8_t *ArgumentBackingBase = reinterpret_cast<uint8_t*>(StackPointer + ArgumentOffset);
@@ -507,54 +532,145 @@ public:
     uint64_t ArgumentBackingBaseGuest = rsp + ArgumentOffset;
     uint64_t EnvpBackingBaseGuest = rsp + EnvpOffset;
 
-    *reinterpret_cast<uint64_t*>(StackPointer + 0) = Args.size();
-    PadPointers[0] = 0;
-
-    // If we don't have any, just make sure the first is nullptr
-    EnvpPointers[0] = 0;
-
     uint64_t CurrentOffset = 0;
-    for (size_t i = 0; i < Args.size(); ++i) {
-      size_t ArgSize = Args[i].size();
-      // Set the pointer to this argument
-      ArgumentPointers[i] = ArgumentBackingBaseGuest + CurrentOffset;
-      // Copy the string in to the final location
-      memcpy(reinterpret_cast<void*>(ArgumentBackingBase + CurrentOffset), &Args[i].at(0), ArgSize);
 
-      // Set the null terminator for the string
-      *reinterpret_cast<uint8_t*>(ArgumentBackingBase + CurrentOffset + ArgSize + 1) = 0;
+    if (File.GetMode() == ELFLoader::ELFContainer::MODE_32BIT) {
+      uint32_t *PadPointers_32 = reinterpret_cast<uint32_t*>(PadPointers);
+      uint32_t *EnvpPointers_32 = reinterpret_cast<uint32_t*>(EnvpPointers);
 
-      CurrentOffset += ArgSize + 1;
-    }
+      PadPointers_32[0] = 0;
 
-    CurrentOffset = 0;
-    for (size_t i = 0; i < EnvironmentVariables.size(); ++i) {
-      size_t EnvpSize = EnvironmentVariables[i].size();
-      // Set the pointer to this argument
-      EnvpPointers[i] = EnvpBackingBaseGuest + CurrentOffset;
+      *reinterpret_cast<uint32_t*>(StackPointer + 0) = Args.size();
+      uint32_t *ArgumentPointers_32 = reinterpret_cast<uint32_t*>(ArgumentPointers);
 
-      // Copy the string in to the final location
-      memcpy(reinterpret_cast<void*>(EnvpBackingBase + CurrentOffset), &EnvironmentVariables[i].at(0), EnvpSize);
+      for (size_t i = 0; i < Args.size(); ++i) {
+        size_t ArgSize = Args[i].size();
+        // Set the pointer to this argument
+        ArgumentPointers_32[i] = ArgumentBackingBaseGuest + CurrentOffset;
 
-      // Set the null terminator for the string
-      *reinterpret_cast<uint8_t*>(EnvpBackingBase + CurrentOffset + EnvpSize + 1) = 0;
+        // Copy the string in to the final location
+        memcpy(reinterpret_cast<void*>(ArgumentBackingBase + CurrentOffset), &Args[i].at(0), ArgSize);
 
-      CurrentOffset += EnvpSize + 1;
-    }
+        // Set the null terminator for the string
+        *reinterpret_cast<uint8_t*>(ArgumentBackingBase + CurrentOffset + ArgSize + 1) = 0;
 
-    // Last envp needs to be nullptr
-    EnvpPointers[EnvironmentVariables.size()] = 0;
-
-    for (size_t i = 0; i < AuxVariables.size(); ++i) {
-      if (AuxVariables[i].key == 25) {
-        auxv_t Random{25, rsp + RandomNumberLocation};
-        uint64_t *RandomLoc = reinterpret_cast<uint64_t*>(StackPointer + RandomNumberLocation);
-        RandomLoc[0] = 0xDEAD;
-        RandomLoc[1] = 0xDEAD2;
-        AuxVPointers[i] = Random;
+        CurrentOffset += ArgSize + 1;
       }
-      else {
-        AuxVPointers[i] = AuxVariables[i];
+
+      CurrentOffset = 0;
+      for (size_t i = 0; i < EnvironmentVariables.size(); ++i) {
+        size_t EnvpSize = EnvironmentVariables[i].size();
+        uint32_t *EnvpPointers_32 = reinterpret_cast<uint32_t*>(EnvpPointers);
+        EnvpPointers_32[i] = EnvpBackingBaseGuest + CurrentOffset;
+
+        // Copy the string in to the final location
+        memcpy(reinterpret_cast<void*>(EnvpBackingBase + CurrentOffset), &EnvironmentVariables[i].at(0), EnvpSize);
+
+        // Set the null terminator for the string
+        *reinterpret_cast<uint8_t*>(EnvpBackingBase + CurrentOffset + EnvpSize + 1) = 0;
+
+        CurrentOffset += EnvpSize + 1;
+      }
+
+      EnvpPointers_32[EnvironmentVariables.size()] = 0;
+
+      auxv32_t *val_32 = reinterpret_cast<auxv32_t*>(AuxVPointers);
+      for (size_t i = 0; i < AuxVariables.size(); ++i) {
+
+        if (AuxVariables[i].key == 25) {
+          auxv_t Random{25, rsp + RandomNumberLocation};
+          uint64_t *RandomLoc = reinterpret_cast<uint64_t*>(StackPointer + RandomNumberLocation);
+          RandomLoc[0] = 0xDEAD;
+          RandomLoc[1] = 0xDEAD2;
+
+          val_32[i].key = Random.key;
+          val_32[i + 1].val = Random.val;
+        }
+        else if (AuxVariables[i].key == 15) {
+          // AT_PLATFORM
+          auxv_t Platform{15, rsp + PlatformStringLocation};
+          char *PlatformLoc = reinterpret_cast<char*>(StackPointer + PlatformStringLocation);
+          strcpy(PlatformLoc, "i686");
+          val_32[i].key = Platform.key;
+          val_32[i + 1].val = Platform.val;
+        }
+        else if (AuxVariables[i].key == 31) {
+          // AT_EXECFN
+          auxv_t Exec{31, rsp + ExecutableStringLocation};
+          char *ExecLoc = reinterpret_cast<char*>(StackPointer + ExecutableStringLocation);
+          strcpy(ExecLoc, std::filesystem::canonical(Filename).c_str());
+          val_32[i].key = Exec.key;
+          val_32[i + 1].val = Exec.val;
+        }
+
+        else {
+          val_32[i].key = AuxVariables[i].key;
+          val_32[i + 1].val = AuxVariables[i].val;
+        }
+      }
+    }
+    else {
+
+      *reinterpret_cast<uint64_t*>(StackPointer + 0) = Args.size();
+
+      uint64_t *PadPointers_64 = reinterpret_cast<uint64_t*>(PadPointers);
+      uint64_t *EnvpPointers_64 = reinterpret_cast<uint64_t*>(EnvpPointers);
+
+      PadPointers_64[0] = 0;
+
+      for (size_t i = 0; i < Args.size(); ++i) {
+        uint64_t *ArgumentPointers_64 = reinterpret_cast<uint64_t*>(ArgumentPointers);
+
+        size_t ArgSize = Args[i].size();
+        // Set the pointer to this argument
+        ArgumentPointers_64[i] = ArgumentBackingBaseGuest + CurrentOffset;
+        // Copy the string in to the final location
+        memcpy(reinterpret_cast<void*>(ArgumentBackingBase + CurrentOffset), &Args[i].at(0), ArgSize);
+
+        // Set the null terminator for the string
+        *reinterpret_cast<uint8_t*>(ArgumentBackingBase + CurrentOffset + ArgSize + 1) = 0;
+
+        CurrentOffset += ArgSize + 1;
+      }
+
+      CurrentOffset = 0;
+      for (size_t i = 0; i < EnvironmentVariables.size(); ++i) {
+        size_t EnvpSize = EnvironmentVariables[i].size();
+        // Set the pointer to this argument
+        uint64_t *EnvpPointers_64 = reinterpret_cast<uint64_t*>(EnvpPointers);
+        EnvpPointers_64[i] = EnvpBackingBaseGuest + CurrentOffset;
+
+        // Copy the string in to the final location
+        memcpy(reinterpret_cast<void*>(EnvpBackingBase + CurrentOffset), &EnvironmentVariables[i].at(0), EnvpSize);
+
+        // Set the null terminator for the string
+        *reinterpret_cast<uint8_t*>(EnvpBackingBase + CurrentOffset + EnvpSize + 1) = 0;
+
+        CurrentOffset += EnvpSize + 1;
+      }
+
+      EnvpPointers_64[EnvironmentVariables.size()] = 0;
+
+      auxv_t *val_64 = reinterpret_cast<auxv_t*>(AuxVPointers);
+      for (size_t i = 0; i < AuxVariables.size(); ++i) {
+        if (AuxVariables[i].key == 25) {
+          auxv_t Random{25, rsp + RandomNumberLocation};
+          uint64_t *RandomLoc = reinterpret_cast<uint64_t*>(StackPointer + RandomNumberLocation);
+          RandomLoc[0] = 0xDEAD;
+          RandomLoc[1] = 0xDEAD2;
+          val_64[i] = Random;
+        }
+        else if (AuxVariables[i].key == 15) {
+          // AT_PLATFORM
+          auxv_t Platform{15, rsp + PlatformStringLocation};
+          char *PlatformLoc = reinterpret_cast<char*>(StackPointer + PlatformStringLocation);
+          strcpy(PlatformLoc, "x86_64");
+          val_64[i].key = Platform.key;
+          val_64[i + 1].val = Platform.val;
+        }
+        else {
+          val_64[i] = AuxVariables[i];
+        }
       }
     }
 
@@ -565,7 +681,7 @@ public:
   }
 
   uint64_t DefaultRIP() const override {
-    return MemoryBase + DB.DefaultRIP();
+    return DB.DefaultRIP();
   }
 
   void MapMemoryRegion(std::function<void*(uint64_t, uint64_t, bool, bool)> Mapper) override {
@@ -574,7 +690,7 @@ public:
 
   void LoadMemory(MemoryWriter Writer) override {
     auto ELFLoaderWrapper = [&](void const *Data, uint64_t Addr, uint64_t Size) -> void {
-      Writer(Data, MemoryBase + Addr, Size);
+      Writer(Data, Addr, Size);
     };
     DB.WriteLoadableSections(ELFLoaderWrapper);
   }
@@ -611,9 +727,15 @@ private:
   std::vector<std::string> Args;
   std::vector<std::string> EnvironmentVariables;
   std::vector<char const*> LoaderArgs;
+  std::string Filename;
   struct auxv_t {
     uint64_t key;
     uint64_t val;
+  };
+
+  struct auxv32_t {
+    uint32_t key;
+    uint32_t val;
   };
   std::vector<auxv_t> AuxVariables;
   uint64_t AuxTabBase, AuxTabSize;

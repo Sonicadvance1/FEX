@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <asm/ldt.h>
 
 namespace FEXCore::Core {
 struct InternalThreadState;

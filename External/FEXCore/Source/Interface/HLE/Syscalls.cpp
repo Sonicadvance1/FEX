@@ -131,9 +131,7 @@ uint64_t SyscallHandler::HandleMMAP(FEXCore::Core::InternalThreadState *Thread, 
 void SyscallHandler::DefaultProgramBreak(FEXCore::Core::InternalThreadState *Thread, uint64_t Addr) {
   DataSpaceSize = 0;
   // Just allocate 1GB of data memory past the default program break location at this point
-  CTX->MapRegion(Thread, Addr, 0x1000'0000, true);
-
-  Addr += CTX->MemoryMapper.GetBaseOffset<uint64_t>(0);
+  CTX->MapRegion(Thread, Addr, 0x1000'0000, true, false);
 
   DataSpace = Addr;
   DefaultProgramBreakAddress = Addr;

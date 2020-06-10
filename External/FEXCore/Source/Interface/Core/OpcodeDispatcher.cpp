@@ -3668,6 +3668,7 @@ OrderedNode *OpDispatchBuilder::LoadSource_WithOpSize(FEXCore::IR::RegisterClass
   uint8_t GPRSize = CTX->Config.Is64BitMode ? 8 : 4;
 
   if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_LITERAL) {
+    _Constant(0x10000000);
     Src = _Constant(Operand.TypeLiteral.Size * 8, Operand.TypeLiteral.Literal);
   }
   else if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_GPR) {
@@ -3678,14 +3679,18 @@ OrderedNode *OpDispatchBuilder::LoadSource_WithOpSize(FEXCore::IR::RegisterClass
       Src = _LoadContext(OpSize, offsetof(FEXCore::Core::CPUState, xmm[Operand.TypeGPR.GPR - FEXCore::X86State::REG_XMM_0][Operand.TypeGPR.HighBits ? 1 : 0]), FPRClass);
     }
     else {
+      LogMan::Throw::A(!(GPRSize == 4 && OpSize > 4), "Oops had a %d GPR load", OpSize);
       Src = _LoadContext(OpSize, offsetof(FEXCore::Core::CPUState, gregs[Operand.TypeGPR.GPR]) + (Operand.TypeGPR.HighBits ? 1 : 0), GPRClass);
     }
   }
   else if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_GPR_DIRECT) {
+    LogMan::Throw::A(!(GPRSize == 4 && OpSize > 4), "Oops had a %d GPR load", OpSize);
     Src = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[Operand.TypeGPR.GPR]), GPRClass);
     LoadableType = true;
   }
   else if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_GPR_INDIRECT) {
+    _Constant(0x10000001);
+
     auto GPR = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[Operand.TypeGPRIndirect.GPR]), GPRClass);
     auto Constant = _Constant(GPRSize * 8, Operand.TypeGPRIndirect.Displacement);
 
@@ -3694,6 +3699,7 @@ OrderedNode *OpDispatchBuilder::LoadSource_WithOpSize(FEXCore::IR::RegisterClass
     LoadableType = true;
   }
   else if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_RIP_RELATIVE) {
+    _Constant(0x10000002);
     if (CTX->Config.Is64BitMode) {
       Src = _Constant(GPRSize * 8, Operand.TypeRIPLiteral.Literal + Op->PC + Op->InstSize);
     }
@@ -3705,6 +3711,8 @@ OrderedNode *OpDispatchBuilder::LoadSource_WithOpSize(FEXCore::IR::RegisterClass
     LoadableType = true;
   }
   else if (Operand.TypeNone.Type == FEXCore::X86Tables::DecodedOperand::TYPE_SIB) {
+    _Constant(0x10000003);
+
     OrderedNode *Tmp {};
     if (Operand.TypeSIB.Index != FEXCore::X86State::REG_INVALID) {
       Tmp = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[Operand.TypeSIB.Index]), GPRClass);
@@ -7227,6 +7235,7 @@ void InstallOpcodeHandlers(Context::OperatingMode Mode) {
     {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 0), 1, &OpDispatchBuilder::INCOp}, // INC
     {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 1), 1, &OpDispatchBuilder::DECOp}, // DEC
     {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 2), 1, &OpDispatchBuilder::CALLAbsoluteOp},
+    {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 3), 1, &OpDispatchBuilder::UnimplementedOp},
     {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 4), 1, &OpDispatchBuilder::JUMPAbsoluteOp},
     {OPD(FEXCore::X86Tables::TYPE_GROUP_5, OpToIndex(0xFF), 6), 1, &OpDispatchBuilder::PUSHOp},
 

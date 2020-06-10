@@ -243,11 +243,68 @@ namespace FEXCore::Context {
       NewThreadState.xmm[i][1] = 0xBAD0DAD1ULL;
     }
     memset(NewThreadState.flags, 0, 32);
-    NewThreadState.gs = 0;
-    NewThreadState.fs = FS_OFFSET;
+
+    if (Config.Is64BitMode) {
+      NewThreadState.gs = 0;
+      NewThreadState.fs = FS_OFFSET;
+    }
+    else {
+      NewThreadState.gs = 0x63;
+      NewThreadState.fs = 0;
+      // GLIBC TLS Data segment
+      NewThreadState.gdt[6] = {
+        .base = 0xFFFF'E000,
+      };
+    }
+
     NewThreadState.flags[1] = 1;
 
     FEXCore::Core::InternalThreadState *Thread = CreateThread(&NewThreadState, 0);
+
+    if (!Config.Is64BitMode) {
+      auto VDSO_Data = MapRegion(Thread, 0xFFFF'C000, 0x2000, true, false);
+      auto TLS_Data = MapRegion(Thread, 0xFFFF'E000, 0x1000, true, false);
+      for (int i = 0; i < 0x1000; i += 4) {
+        uint32_t Ptr = 0xFFFF'C000 + (i / 4);
+        if (i == 0x10) {
+          Ptr = 0xFFFF'D150;
+        }
+        memcpy((void*)((uint64_t)TLS_Data + i), &Ptr, sizeof(uint32_t));
+      }
+
+      if (0) {
+        memset(VDSO_Data, 0xCC, 0x2000);
+
+        uint8_t *VDSO_Bytes = (uint8_t*)VDSO_Data;
+
+        const std::vector<uint8_t> vdso_syscall = {
+          0x51,
+          0x52,
+          0x55,
+          0x89, 0xCD,
+          0x0F, 0x05,    // syscall
+          // 0xCD, 0x80, // int 0x80
+          0x5D,
+          0x5A,
+          0x59,
+          0xC3
+        };
+        memcpy(&VDSO_Bytes[0x1150], &vdso_syscall.at(0), vdso_syscall.size());
+      }
+      else {
+        FILE *fp = fopen("/home/ryanh/vdso_x32.so", "rb");
+        if (!fp) {
+          LogMan::Msg::A("Failed to open vdso");
+        }
+        else {
+          size_t Result = fread(VDSO_Data, sizeof(uint8_t), 0x2000, fp);
+          if (Result != 0x2000) {
+            LogMan::Msg::A("Failed to read vdso file. Result 0x%lx != 0x2000", Result);
+          }
+          fclose(fp);
+        }
+      }
+    }
 
     // We are the parent thread
     ParentThread = Thread;
