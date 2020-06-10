@@ -1105,11 +1105,33 @@ void OpDispatchBuilder::FLAGControlOp(OpcodeArgs) {
   SetRFLAG(Result, Flag);
 }
 
+
+template<bool ToSeg>
 void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
+  uint8_t GPRSize = CTX->Config.Is64BitMode ? 8 : 4;
+
   // In x86-64 mode the accesses to the segment registers end up being constant zero moves
   // Aside from FS/GS
-  LogMan::Msg::A("Wanting reg: %d\n", Op->Src[0].TypeGPR.GPR);
-  //  StoreResult(Op, Src);
+  if (ToSeg) {
+    OrderedNode *Src = LoadSource_WithOpSize(GPRClass, Op, Op->Src[0], 2, Op->Flags, -1);
+
+    switch (Op->Dest.TypeGPR.GPR) {
+      case 6: // GS
+        _StoreContext(GPRClass, GPRSize, offsetof(FEXCore::Core::CPUState, gs), Src);
+        break;
+      default: LogMan::Msg::A("Unknown segment register: %d", Op->Dest.TypeGPR.GPR);
+    }
+  }
+  else {
+    OrderedNode *Segment{};
+    switch (Op->Src[0].TypeGPR.GPR) {
+      case 6: // GS
+        Segment = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gs), GPRClass);
+        break;
+      default: LogMan::Msg::A("Unknown segment register: %d", Op->Dest.TypeGPR.GPR);
+    }
+    StoreResult(GPRClass, Op, Segment, -1);
+  }
 }
 
 void OpDispatchBuilder::MOVOffsetOp(OpcodeArgs) {
@@ -6923,7 +6945,9 @@ void InstallOpcodeHandlers(Context::OperatingMode Mode) {
     {0x86, 2, &OpDispatchBuilder::XCHGOp},
     {0x88, 4, &OpDispatchBuilder::MOVGPROp<0>},
 
+    {0x8C, 1, &OpDispatchBuilder::MOVSegOp<false>},
     {0x8D, 1, &OpDispatchBuilder::LEAOp},
+    {0x8E, 1, &OpDispatchBuilder::MOVSegOp<true>},
     {0x8F, 1, &OpDispatchBuilder::POPOp},
     {0x90, 8, &OpDispatchBuilder::XCHGOp},
 
