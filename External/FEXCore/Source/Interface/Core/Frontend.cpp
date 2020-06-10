@@ -641,6 +641,30 @@ bool Decoder::NormalOpHeader(FEXCore::X86Tables::X86InstInfo const *Info, uint16
     uint8_t EVEXOp = ReadByte();
     return NormalOp(&EVEXTableOps[EVEXOp], EVEXOp);
   }
+  else if (Info->Type == FEXCore::X86Tables::TYPE_REX_PREFIX) {
+    LogMan::Throw::A(CTX->Config.Is64BitMode, "Got REX prefix in 32bit mode");
+    DecodeInst->Flags |= DecodeFlags::FLAG_REX_PREFIX;
+
+    // Widening displacement
+    if (Op & 0b1000) {
+      DecodeInst->Flags |= DecodeFlags::FLAG_REX_WIDENING;
+      DecodeInst->Flags = (DecodeInst->Flags & ~DecodeFlags::FLAG_OPADDR_MASK) | DecodeFlags::FLAG_WIDENING_SIZE_LAST;
+    }
+
+    // XGPR_B bit set
+    if (Op & 0b0001)
+      DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_B;
+
+    // XGPR_X bit set
+    if (Op & 0b0010)
+      DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_X;
+
+    // XGPR_R bit set
+    if (Op & 0b0100)
+      DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_R;
+
+    return true;
+  }
 
   return NormalOp(Info, Op);
 }
@@ -777,49 +801,29 @@ bool Decoder::DecodeInstruction(uint64_t PC) {
       DecodeInst->Flags |= DecodeFlags::FLAG_ADDRESS_SIZE;
     break;
     case 0x26: // ES legacy prefix
+      if (!CTX->Config.Is64BitMode) {
+        DecodeInst->Flags |= DecodeFlags::FLAG_ES_PREFIX;
+      }
+      break;
     case 0x2E: // CS legacy prefix
+      if (!CTX->Config.Is64BitMode) {
+        DecodeInst->Flags |= DecodeFlags::FLAG_CS_PREFIX;
+      }
+      break;
+    case 0x36: // SS legacy prefix
+      if (!CTX->Config.Is64BitMode) {
+        DecodeInst->Flags |= DecodeFlags::FLAG_SS_PREFIX;
+      }
+      break;
     case 0x3E: // DS legacy prefix
       // Annoyingly GCC generates NOP ops with these prefixes
       // Just ignore them for now
       // eg. 66 2e 0f 1f 84 00 00 00 00 00 nop    WORD PTR cs:[rax+rax*1+0x0]
-    break;
-    case 0x40: // REX - 0x40-0x4F
-    case 0x41:
-    case 0x42:
-    case 0x43:
-    case 0x44:
-    case 0x45:
-    case 0x46:
-    case 0x47:
-    case 0x48:
-    case 0x49:
-    case 0x4A:
-    case 0x4B:
-    case 0x4C:
-    case 0x4D:
-    case 0x4E:
-    case 0x4F: {
-      DecodeInst->Flags |= DecodeFlags::FLAG_REX_PREFIX;
-
-      // Widening displacement
-      if (Op & 0b1000) {
-        DecodeInst->Flags |= DecodeFlags::FLAG_REX_WIDENING;
-        DecodeInst->Flags = (DecodeInst->Flags & ~DecodeFlags::FLAG_OPADDR_MASK) | DecodeFlags::FLAG_WIDENING_SIZE_LAST;
+      if (!CTX->Config.Is64BitMode) {
+        DecodeInst->Flags |= DecodeFlags::FLAG_DS_PREFIX;
       }
-
-      // XGPR_B bit set
-      if (Op & 0b0001)
-        DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_B;
-
-      // XGPR_X bit set
-      if (Op & 0b0010)
-        DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_X;
-
-      // XGPR_R bit set
-      if (Op & 0b0100)
-        DecodeInst->Flags |= DecodeFlags::FLAG_REX_XGPR_R;
+      break;
     break;
-    }
     case 0xF0: // LOCK prefix
       DecodeInst->Flags |= DecodeFlags::FLAG_LOCK;
     break;
