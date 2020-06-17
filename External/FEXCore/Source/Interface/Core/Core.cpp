@@ -6,6 +6,7 @@
 #include "Interface/Core/BlockSamplingData.h"
 #include "Interface/Core/Core.h"
 #include "Interface/Core/DebugData.h"
+#include "Interface/Core/ELFMapper.h"
 #include "Interface/Core/OpcodeDispatcher.h"
 #include "Interface/Core/Interpreter/InterpreterCore.h"
 #include "Interface/Core/JIT/JITCore.h"
@@ -625,7 +626,8 @@ namespace FEXCore::Context {
     if (CodePtr != nullptr) {
       // The core managed to compile the code.
 #if ENABLE_JITSYMBOLS
-      Symbols.Register(CodePtr, GuestRIP, DebugData->HostCodeSize);
+      auto Symbol = FEXCore::ELFMapper::FindELFSymbol(GuestRIP);
+      Symbols.Register(CodePtr, GuestRIP, DebugData->HostCodeSize, Symbol.first, Symbol.second);
 #endif
 
       return AddBlockMapping(Thread, GuestRIP, CodePtr);

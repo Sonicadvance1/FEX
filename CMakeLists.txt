@@ -8,6 +8,7 @@ option(ENABLE_XRAY "Enable building with LLVM X-Ray" FALSE)
 option(ENABLE_LLD "Enable linking with LLD" FALSE)
 option(ENABLE_ASAN "Enables Clang ASAN" FALSE)
 option(ENABLE_TSAN "Enables Clang TSAN" FALSE)
+option(ENABLE_JITSYMBOLS "Enables perf JIT symbols" FALSE)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

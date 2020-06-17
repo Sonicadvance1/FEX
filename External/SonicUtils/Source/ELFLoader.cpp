@@ -8,9 +8,11 @@
 
 namespace ELFLoader {
 
-ELFContainer::ELFContainer(std::string const &Filename, std::string const &RootFS, bool CustomInterpreter) {
+ELFContainer::ELFContainer(std::string const &Filename, std::string const &RootFS, bool CustomInterpreter)
+  : Filename {Filename} {
   if (!LoadELF(Filename)) {
     LogMan::Msg::E("Couldn't Load ELF file");
+    WasLoaded = false;
     return;
   }
 
@@ -30,6 +32,7 @@ ELFContainer::ELFContainer(std::string const &Filename, std::string const &RootF
     }
     else if (!LoadELF(RawString)) {
       LogMan::Msg::E("Couldn't load dynamic ELF file's interpreter");
+      WasLoaded = false;
       return;
     }
   }
@@ -51,6 +54,14 @@ ELFContainer::ELFContainer(std::string const &Filename, std::string const &RootF
   //PrintDynamicTable();
 
   //LogMan::Throw::A(InterpreterHeader == nullptr, "Can only handle static programs");
+  WasLoaded = true;
+}
+
+ELFContainer::ELFContainer(void const *Code, size_t Size) {
+  RawFile.resize(Size);
+  memcpy(&RawFile.at(0), Code, Size);
+
+  WasLoaded = LoadELFData();
 }
 
 ELFContainer::~ELFContainer() {
@@ -82,6 +93,10 @@ bool ELFContainer::LoadELF(std::string const &Filename) {
 
   ELFFile.close();
 
+  return LoadELFData();
+}
+
+bool ELFContainer::LoadELFData() {
   InterpreterHeader._64 = nullptr;
 
   SectionHeaders.clear();
@@ -93,7 +108,6 @@ bool ELFContainer::LoadELF(std::string const &Filename) {
       Ident[EI_MAG1] != ELFMAG1 ||
       Ident[EI_MAG2] != ELFMAG2 ||
       Ident[EI_MAG3] != ELFMAG3) {
-    LogMan::Msg::E("ELF missing magic cookie");
     return false;
   }
 
@@ -106,6 +120,7 @@ bool ELFContainer::LoadELF(std::string const &Filename) {
 
   LogMan::Msg::E("Unknown ELF type");
   return false;
+
 }
 
 bool ELFContainer::LoadELF_32() {
@@ -242,10 +257,12 @@ ELFSymbol const *ELFContainer::GetSymbolInRange(RangeType Address) {
   if (Sym == SymbolMapByAddress.end())
     return nullptr;
 
-  if ((Sym->second->Address + Sym->second->Size) < Address.first)
-    return nullptr;
+  if (Sym->second->Address <= Address.first &&
+      (Sym->second->Address + Sym->second->Size) > Address.first) {
+    return Sym->second;
+  }
 
-  return Sym->second;
+  return nullptr;
 }
 
 void ELFContainer::CalculateMemoryLayouts() {

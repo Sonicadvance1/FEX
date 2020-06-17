@@ -2,6 +2,7 @@
 
 #include "Interface/Context/Context.h"
 #include "Interface/Core/InternalThreadState.h"
+#include "Interface/Core/ELFMapper.h"
 #include "Interface/HLE/Syscalls.h"
 #include "Interface/HLE/x64/Syscalls.h"
 #include "Interface/HLE/x32/Syscalls.h"
@@ -54,77 +55,28 @@ uint64_t SyscallHandler::HandleBRK(FEXCore::Core::InternalThreadState *Thread, v
 }
 
 uint64_t SyscallHandler::HandleMMAP(FEXCore::Core::InternalThreadState *Thread, void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-  std::lock_guard<std::mutex> lk(MMapMutex);
-
-  uint64_t Base = AlignDown(LastMMAP, PAGE_SIZE);
-  uint64_t Size = AlignUp(length, PAGE_SIZE);
-  if (length == 0) {
-    return -EINVAL;
-  }
-  if ((LastMMAP + length) >= ENDMMAP) {
-    LogMan::Msg::D("uhoh, mmap failed\n");
-    return -ENOMEM;
-  }
-
   if (flags & MAP_FIXED) {
-    Base = reinterpret_cast<uint64_t>(addr);
-    if (fd != -1) {
+    uint64_t Result = reinterpret_cast<uint64_t>(::mmap(addr, length, prot, flags, fd, offset));
+    if (fd != -1 && offset == 0) {
       auto Name = FM.FindFDName(fd);
-      if (Name) {
-        LogMan::Msg::D("Mapping File to [0x%lx, 0x%lx) -> '%s' -> %p", Base, Base + Size, Name->c_str(), Base);
+      if (Name && Result) {
+        LogMan::Msg::D("Mapping File to [0x%lx, 0x%lx) -> '%s' -> %p", Result, Result + length, Name->c_str(), Result);
+        FEXCore::ELFMapper::AddELFToList(Name, Result, length);
       }
     }
-
-    void *Res{};
-    if (fd != -1) {
-      Res = mmap(addr, length, prot, flags, fd, offset);
-      if (Res == MAP_FAILED) {
-        LogMan::Msg::A("Couldn't map file to %p\n", addr);
-      }
-    }
-    else {
-      Res = mmap(addr, length, prot, flags, fd, offset);
-    }
-
-    if (Res == MAP_FAILED) {
-      return -errno;
-    }
-
-    return Base;
+    SYSCALL_ERRNO();
   }
   else {
-    // If we are running unified memory then we want to be after our base
-    // This makes code page loading less of a burden
-    Base = CTX->MemoryMapper.GetBaseOffset<uint64_t>(LastMMAP);
-
-    void *HostPtr = reinterpret_cast<void*>(Base);
+    uint64_t Result = reinterpret_cast<uint64_t>(::mmap(addr, length, prot, flags, fd, offset));
     if (fd != -1) {
       auto Name = FM.FindFDName(fd);
-      if (Name) {
-        LogMan::Msg::D("Mapping File to [0x%lx, 0x%lx) -> '%s' -> %p", Base, Base + Size, Name->c_str(), HostPtr);
+      if (Name && Result) {
+        LogMan::Msg::D("Mapping File to [0x%lx, 0x%lx) -> '%s' -> %p", Result, Result + length, Name->c_str(), Result);
+        FEXCore::ELFMapper::AddELFToList(Name, Result, length);
       }
     }
 
-    void *Res{};
-    if (fd != -1) {
-      Res = mmap(HostPtr, length, prot, flags | MAP_FIXED, fd, offset);
-      if (Res == MAP_FAILED) {
-        perror(nullptr);
-        LogMan::Msg::A("Couldn't map file to %p. error %d(%s)\n", HostPtr, errno, strerror(errno));
-      }
-      else {
-      }
-    }
-    else {
-      Res = mmap(HostPtr, length, prot, flags | MAP_FIXED, fd, offset);
-    }
-
-    if (Res == MAP_FAILED) {
-      return -errno;
-    }
-
-    LastMMAP += Size;
-    return Base;
+    SYSCALL_ERRNO();
   }
 }
 

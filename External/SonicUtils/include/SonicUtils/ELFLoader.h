@@ -22,6 +22,7 @@ struct ELFSymbol {
 class ELFContainer {
 public:
   ELFContainer(std::string const &Filename, std::string const &RootFS, bool CustomInterpreter);
+  ELFContainer(void const *Code, size_t Size);
   ~ELFContainer();
 
   uint64_t GetEntryPoint() const {
@@ -76,8 +77,12 @@ public:
 
   ELFMode GetMode() const { return Mode; }
 
+  bool Loaded() const { return WasLoaded; }
+  std::string const &GetFilename() const { return Filename; }
+
 private:
   bool LoadELF(std::string const &Filename);
+  bool LoadELFData();
   bool LoadELF_32();
   bool LoadELF_64();
   void CalculateMemoryLayouts();
@@ -124,6 +129,8 @@ private:
   bool DynamicProgram{false};
   std::string DynamicLinker;
   ProgramHeader TLSHeader{};
+  bool WasLoaded{};
+  std::string Filename{};
 };
 
 } // namespace ELFLoader

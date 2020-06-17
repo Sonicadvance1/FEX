@@ -119,6 +119,7 @@ set (SRCS
   Interface/Core/BlockSamplingData.cpp
   Interface/Core/Core.cpp
   Interface/Core/CPUID.cpp
+  Interface/Core/ELFMapper.cpp
   Interface/Core/Frontend.cpp
   Interface/Core/GdbServer.cpp
   Interface/Core/OpcodeDispatcher.cpp
