@@ -60,6 +60,56 @@ void JITCore::Op_Unhandled(FEXCore::IR::IROp_Header *IROp, uint32_t Node) {
 void JITCore::Op_NoOp(FEXCore::IR::IROp_Header *IROp, uint32_t Node) {
 }
 
+bool JITCore::HandleFault(int Signal, void *info, void *ucontext) {
+#if _M_X86_64
+  return false;
+#else
+  siginfo_t *Info = static_cast<siginfo_t*>(info);
+  ucontext_t* _context = (ucontext_t*)ucontext;
+  mcontext_t* _mcontext = &_context->uc_mcontext;
+  int sicode = Info->si_code;
+  uintptr_t FaultAddress = (uintptr_t)Info->si_addr;
+  uint32_t *PC = (uint32_t*)_mcontext->pc;
+  uint32_t Instr = PC[0];
+
+  // 1 = 16bit
+  // 2 = 32bit
+  // 3 = 64bit
+  uint32_t Size = (Instr & 0xC000'0000) >> 30;
+  uint32_t AddrReg = (Instr >> 5) & 0x1F;
+  uint32_t DataReg = Instr & 0x1F;
+  uint32_t DMB = 0b1101'0101'0000'0011'0011'0000'1011'1111 |
+    0b1011'0000'0000; // Inner shareable all
+  PC[-1] = DMB;
+  PC[1] = DMB;
+
+  if ((Instr & 0x3F'FF'FC'00) == 0x08'9F'7C'00) {
+    // STLLR*
+    uint32_t STR = 0b0011'1000'0011'1111'0110'1000'0000'0000;
+    STR |= Size << 30;
+    STR |= AddrReg << 5;
+    STR |= DataReg;
+    PC[0] = STR;
+  }
+  else if ((Instr & 0x3F'FF'FC'00) == 0x08'DF'7C'00) {
+    // LDLLR*
+    uint32_t LDR = 0b0011'1000'0111'1111'0110'1000'0000'0000;
+    LDR |= Size << 30;
+    LDR |= AddrReg << 5;
+    LDR |= DataReg;
+    PC[0] = LDR;
+  }
+  else {
+    return false;
+  }
+
+  // Back up one instruction and have another go
+  _mcontext->pc -= 4;
+  vixl::aarch64::CPU::EnsureIAndDCacheCoherency(&PC[-1], 16);
+  return true;
+#endif
+}
+
 JITCore::JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalThreadState *Thread)
   : vixl::aarch64::MacroAssembler(MAX_CODE_SIZE, vixl::aarch64::PositionDependentCode)
   , CTX {ctx}
@@ -139,6 +189,17 @@ JITCore::JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalThreadSt
   RegisterMiscHandlers();
   RegisterMoveHandlers();
   RegisterVectorHandlers();
+
+  // This will register the host signal handler per thread, which is fine
+  CTX->SignalDelegation.RegisterHostSignalHandler(SIGBUS, [](FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext) -> bool {
+    // If this isn't a guest thread then we can't handle this
+    if (!Thread) {
+      return false;
+    }
+
+    JITCore *Core = reinterpret_cast<JITCore*>(Thread->CPUBackend.get());
+    return Core->HandleFault(Signal, info, ucontext);
+  });
 }
 
 void JITCore::ClearCache() {

@@ -102,6 +102,8 @@ public:
 
   void ClearCache() override;
 
+  bool HandleFault(int Signal, void *info, void *ucontext);
+
 private:
   FEXCore::Context::Context *CTX;
   FEXCore::Core::InternalThreadState *State;
