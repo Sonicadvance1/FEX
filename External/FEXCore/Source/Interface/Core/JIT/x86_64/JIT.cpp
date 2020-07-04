@@ -114,7 +114,7 @@ private:
 #ifdef BLOCKSTATS
   bool GetSamplingData {true};
 #endif
-  static constexpr uint32_t MAX_CODE_SIZE = 1024 * 1024 * 32;
+  static constexpr uint32_t MAX_CODE_SIZE = 1024 * 1024 * 128;
 };
 
 JITCore::JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalThreadState *Thread)
