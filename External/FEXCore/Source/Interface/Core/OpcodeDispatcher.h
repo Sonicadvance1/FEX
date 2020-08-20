@@ -348,7 +348,6 @@ public:
     FLAGS_X87,
     FLAGS_RFLAGS,
   };
-  template<size_t width, bool Integer, FCOMIFlags whichflags, bool pop>
   void FCOMI(OpcodeArgs);
 
   void FXSaveOp(OpcodeArgs);

@@ -5903,8 +5903,82 @@ void OpDispatchBuilder::FNINIT(OpcodeArgs) {
   SetX87Top(_Constant(0));
 }
 
-template<size_t width, bool Integer, OpDispatchBuilder::FCOMIFlags whichflags, bool pop>
 void OpDispatchBuilder::FCOMI(OpcodeArgs) {
+
+  size_t width{};
+  bool Integer{};
+  OpDispatchBuilder::FCOMIFlags whichflags{};
+
+#define OPD(op, modrmop) (((op - 0xD8) << 8) | modrmop)
+#define OPDReg(op, reg) (((op - 0xD8) << 8) | (reg << 3))
+  switch (Op->OP) {
+    case OPD(0xDB, 0xE8) ... OPD(0xDB, 0xEF): // FUCOMI st0, sti
+    case OPD(0xDB, 0xF0) ... OPD(0xDB, 0xF7): //  FCOMI st0, sti
+    case OPD(0xDF, 0xE8) ... OPD(0xDF, 0xEF): // FUCOMIP st0, sti
+    case OPD(0xDF, 0xF0) ... OPD(0xDF, 0xF7): // FCOMIP st0, sti
+      width = 80;
+      Integer = false;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_RFLAGS;
+      break;
+    case (OPDReg(0xD8, 2) | 0x00) ... (OPDReg(0xD8, 2) | 0x07):
+    case (OPDReg(0xD8, 2) | 0x40) ... (OPDReg(0xD8, 2) | 0x47):
+    case (OPDReg(0xD8, 2) | 0x80) ... (OPDReg(0xD8, 2) | 0x87): // FCOM Mem32
+    case (OPDReg(0xD8, 3) | 0x00) ... (OPDReg(0xD8, 3) | 0x07):
+    case (OPDReg(0xD8, 3) | 0x40) ... (OPDReg(0xD8, 3) | 0x47):
+    case (OPDReg(0xD8, 3) | 0x80) ... (OPDReg(0xD8, 3) | 0x87): // FCOMP Mem32
+      width = 32;
+      Integer = false;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    case (OPDReg(0xDA, 2) | 0x00) ... (OPDReg(0xDA, 2) | 0x07):
+    case (OPDReg(0xDA, 2) | 0x40) ... (OPDReg(0xDA, 2) | 0x47):
+    case (OPDReg(0xDA, 2) | 0x80) ... (OPDReg(0xDA, 2) | 0x87): // FICOM Mem32
+    case (OPDReg(0xDA, 3) | 0x00) ... (OPDReg(0xDA, 3) | 0x07):
+    case (OPDReg(0xDA, 3) | 0x40) ... (OPDReg(0xDA, 3) | 0x47):
+    case (OPDReg(0xDA, 3) | 0x80) ... (OPDReg(0xDA, 3) | 0x87): // FICOMP Mem32
+      width = 32;
+      Integer = true;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    case OPD(0xDA, 0xE9): // FUCOMPP st0, sti
+    case OPD(0xDE, 0xD9): // FCOMPP
+      width = 80;
+      Integer = false;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    case (OPDReg(0xDC, 2) | 0x00) ... (OPDReg(0xDC, 2) | 0x07):
+    case (OPDReg(0xDC, 2) | 0x40) ... (OPDReg(0xDC, 2) | 0x47):
+    case (OPDReg(0xDC, 2) | 0x80) ... (OPDReg(0xDC, 2) | 0x87): // FCOM Mem64
+    case (OPDReg(0xDC, 3) | 0x00) ... (OPDReg(0xDC, 3) | 0x07):
+    case (OPDReg(0xDC, 3) | 0x40) ... (OPDReg(0xDC, 3) | 0x47):
+    case (OPDReg(0xDC, 3) | 0x80) ... (OPDReg(0xDC, 3) | 0x87): // FCOMP Mem64
+      width = 64;
+      Integer = false;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    case OPD(0xDD, 0xE0) ... OPD(0xDD, 0xE7): //  FUCOM st0, sti
+    case OPD(0xDD, 0xE8) ... OPD(0xDD, 0xEF): // FUCOMP st0, sti
+      width = 80;
+      Integer = false;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    case (OPDReg(0xDE, 2) | 0x00) ... (OPDReg(0xDE, 2) | 0x07):
+    case (OPDReg(0xDE, 2) | 0x40) ... (OPDReg(0xDE, 2) | 0x47):
+    case (OPDReg(0xDE, 2) | 0x80) ... (OPDReg(0xDE, 2) | 0x87): // FICOM Mem16
+    case (OPDReg(0xDE, 3) | 0x00) ... (OPDReg(0xDE, 3) | 0x07):
+    case (OPDReg(0xDE, 3) | 0x40) ... (OPDReg(0xDE, 3) | 0x47):
+    case (OPDReg(0xDE, 3) | 0x80) ... (OPDReg(0xDE, 3) | 0x87): // FICOMP Mem16
+      width = 16;
+      Integer = true;
+      whichflags = OpDispatchBuilder::FCOMIFlags::FLAGS_X87;
+      break;
+    default:
+      printf("Unknown op: 0x%x\n", Op->OP);
+      exit(-1);
+      break;
+  }
+#undef OPD
+#undef OPDReg
   Current_Header->ShouldInterpret = true;
 
   auto top = GetX87Top();
@@ -7600,9 +7674,7 @@ constexpr uint16_t PF_F2 = 3;
 
     {OPDReg(0xD8, 1) | 0x00, 8, &OpDispatchBuilder::FMUL<32, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
-    {OPDReg(0xD8, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI<32, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
-
-    {OPDReg(0xD8, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI<32, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+    {OPDReg(0xD8, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
     {OPDReg(0xD8, 4) | 0x00, 8, &OpDispatchBuilder::FSUB<32, false, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
@@ -7614,8 +7686,8 @@ constexpr uint16_t PF_F2 = 3;
 
       {OPD(0xD8, 0xC0), 8, &OpDispatchBuilder::FADD<80, false, OpDispatchBuilder::OpResult::RES_ST0>},
       {OPD(0xD8, 0xC8), 8, &OpDispatchBuilder::FMUL<80, false, OpDispatchBuilder::OpResult::RES_ST0>},
-      {OPD(0xD8, 0xD0), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
-      {OPD(0xD8, 0xD8), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+      {OPD(0xD8, 0xD0), 8, &OpDispatchBuilder::FCOMI},
+      {OPD(0xD8, 0xD8), 8, &OpDispatchBuilder::FCOMI},
       {OPD(0xD8, 0xE0), 8, &OpDispatchBuilder::FSUB<80, false, false, OpDispatchBuilder::OpResult::RES_ST0>},
       {OPD(0xD8, 0xE8), 8, &OpDispatchBuilder::FSUB<80, false, true, OpDispatchBuilder::OpResult::RES_ST0>},
       {OPD(0xD8, 0xF0), 8, &OpDispatchBuilder::FDIV<80, false, false, OpDispatchBuilder::OpResult::RES_ST0>},
@@ -7678,9 +7750,9 @@ constexpr uint16_t PF_F2 = 3;
 
     {OPDReg(0xDA, 1) | 0x00, 8, &OpDispatchBuilder::FMUL<32, true, OpDispatchBuilder::OpResult::RES_ST0>},
 
-    {OPDReg(0xDA, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI<32, true, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
+    {OPDReg(0xDA, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
-    {OPDReg(0xDA, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI<32, true, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+    {OPDReg(0xDA, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
     {OPDReg(0xDA, 4) | 0x00, 8, &OpDispatchBuilder::FSUB<32, true, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
@@ -7696,7 +7768,7 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xDA, 0xD8), 8, &OpDispatchBuilder::X87FCMOV},
       // E0 = Invalid
       // E8 = Invalid
-      {OPD(0xDA, 0xE9), 1, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+      {OPD(0xDA, 0xE9), 1, &OpDispatchBuilder::FCOMI},
       // EA = Invalid
       // F0 = Invalid
       // F8 = Invalid
@@ -7726,8 +7798,8 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xDB, 0xE2), 1, &OpDispatchBuilder::NOPOp}, // FNCLEX
       {OPD(0xDB, 0xE3), 1, &OpDispatchBuilder::FNINIT},
       // E4 = Invalid
-      {OPD(0xDB, 0xE8), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_RFLAGS, false>},
-      {OPD(0xDB, 0xF0), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_RFLAGS, false>},
+      {OPD(0xDB, 0xE8), 8, &OpDispatchBuilder::FCOMI},
+      {OPD(0xDB, 0xF0), 8, &OpDispatchBuilder::FCOMI},
 
       // F8 = Invalid
 
@@ -7735,9 +7807,9 @@ constexpr uint16_t PF_F2 = 3;
 
     {OPDReg(0xDC, 1) | 0x00, 8, &OpDispatchBuilder::FMUL<64, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
-    {OPDReg(0xDC, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI<64, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
+    {OPDReg(0xDC, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
-    {OPDReg(0xDC, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI<64, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+    {OPDReg(0xDC, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
     {OPDReg(0xDC, 4) | 0x00, 8, &OpDispatchBuilder::FSUB<64, false, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
@@ -7773,16 +7845,16 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xDD, 0xD0), 8, &OpDispatchBuilder::FST},
       {OPD(0xDD, 0xD8), 8, &OpDispatchBuilder::FST},
 
-      {OPD(0xDD, 0xE0), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
-      {OPD(0xDD, 0xE8), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+      {OPD(0xDD, 0xE0), 8, &OpDispatchBuilder::FCOMI},
+      {OPD(0xDD, 0xE8), 8, &OpDispatchBuilder::FCOMI},
 
     {OPDReg(0xDE, 0) | 0x00, 8, &OpDispatchBuilder::FADD<16, true, OpDispatchBuilder::OpResult::RES_ST0>},
 
     {OPDReg(0xDE, 1) | 0x00, 8, &OpDispatchBuilder::FMUL<16, true, OpDispatchBuilder::OpResult::RES_ST0>},
 
-    {OPDReg(0xDE, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI<16, true, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, false>},
+    {OPDReg(0xDE, 2) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
-    {OPDReg(0xDE, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI<16, true, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+    {OPDReg(0xDE, 3) | 0x00, 8, &OpDispatchBuilder::FCOMI},
 
     {OPDReg(0xDE, 4) | 0x00, 8, &OpDispatchBuilder::FSUB<16, true, false, OpDispatchBuilder::OpResult::RES_ST0>},
 
@@ -7794,7 +7866,7 @@ constexpr uint16_t PF_F2 = 3;
 
       {OPD(0xDE, 0xC0), 8, &OpDispatchBuilder::FADD<80, false, OpDispatchBuilder::OpResult::RES_STI>},
       {OPD(0xDE, 0xC8), 8, &OpDispatchBuilder::FMUL<80, false, OpDispatchBuilder::OpResult::RES_STI>},
-      {OPD(0xDE, 0xD9), 1, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_X87, true>},
+      {OPD(0xDE, 0xD9), 1, &OpDispatchBuilder::FCOMI},
       {OPD(0xDE, 0xE0), 8, &OpDispatchBuilder::FSUB<80, false, false, OpDispatchBuilder::OpResult::RES_STI>},
       {OPD(0xDE, 0xE8), 8, &OpDispatchBuilder::FSUB<80, false, true, OpDispatchBuilder::OpResult::RES_STI>},
       {OPD(0xDE, 0xF0), 8, &OpDispatchBuilder::FDIV<80, false, false, OpDispatchBuilder::OpResult::RES_STI>},
@@ -7821,8 +7893,8 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xDF, 0xC0), 8, &OpDispatchBuilder::X87ModifySTP<true>},
 
       {OPD(0xDF, 0xE0), 8, &OpDispatchBuilder::X87FNSTSW},
-      {OPD(0xDF, 0xE8), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_RFLAGS, true>},
-      {OPD(0xDF, 0xF0), 8, &OpDispatchBuilder::FCOMI<80, false, OpDispatchBuilder::FCOMIFlags::FLAGS_RFLAGS, true>},
+      {OPD(0xDF, 0xE8), 8, &OpDispatchBuilder::FCOMI},
+      {OPD(0xDF, 0xF0), 8, &OpDispatchBuilder::FCOMI},
   };
 #undef OPD
 #undef OPDReg
