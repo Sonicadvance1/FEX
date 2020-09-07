@@ -114,6 +114,7 @@ void *InterpreterCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true
 }
 
 void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
+  volatile void* stack = alloca(0);
   auto IR = Thread->IRLists.find(Thread->State.State.rip);
   CurrentIR = IR->second.get();
 
@@ -238,6 +239,10 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
           }
           case IR::OP_SIGNALRETURN: {
             SignalReturn(State);
+            break;
+          }
+          case IR::OP_CALLBACKRETURN: {
+            ReturnPtr(State, stack);
             break;
           }
           case IR::OP_SYSCALL: {
