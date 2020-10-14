@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1602712724972,
+  "lastUpdate": 1602713659384,
   "repoUrl": "https://github.com/Sonicadvance1/FEX",
   "entries": {
     "Benchmark": [
@@ -62,6 +62,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.03741602320593872",
             "extra": "mean: 12.31210400120035 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "Sonicadvance1@gmail.com",
+            "name": "Ryan Houdek",
+            "username": "Sonicadvance1"
+          },
+          "committer": {
+            "email": "Sonicadvance1@gmail.com",
+            "name": "Ryan Houdek",
+            "username": "Sonicadvance1"
+          },
+          "distinct": true,
+          "id": "64d574d63c89bdf1619b37fd00dcb7dd893e5025",
+          "message": "more cleanup",
+          "timestamp": "2020-10-14T15:12:28-07:00",
+          "tree_id": "2c13b1acec1b9ac37efbe7314c3ea8bd3a90aa5e",
+          "url": "https://github.com/Sonicadvance1/FEX/commit/64d574d63c89bdf1619b37fd00dcb7dd893e5025"
+        },
+        "date": 1602713658824,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "FEX/Scripts/Execute_FEX.py::test_povray_bench",
+            "value": 0.08016841953199186,
+            "unit": "iter/sec",
+            "range": "stddev: 0.12505202663993611",
+            "extra": "mean: 12.47373973240101 sec\nrounds: 5"
           }
         ]
       }
