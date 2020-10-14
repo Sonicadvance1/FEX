@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1602713875080,
+  "lastUpdate": 1602714099195,
   "repoUrl": "https://github.com/Sonicadvance1/FEX",
   "entries": {
     "Benchmark": [
@@ -124,6 +124,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.23589563267959998",
             "extra": "mean: 12.454575752400705 sec\nrounds: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "Sonicadvance1@gmail.com",
+            "name": "Ryan Houdek",
+            "username": "Sonicadvance1"
+          },
+          "committer": {
+            "email": "Sonicadvance1@gmail.com",
+            "name": "Ryan Houdek",
+            "username": "Sonicadvance1"
+          },
+          "distinct": true,
+          "id": "3cd90b7f4630fda7f16fd165e070f41a159c9f38",
+          "message": "Oops, arch split doesn't work when it is already split?",
+          "timestamp": "2020-10-14T15:19:34-07:00",
+          "tree_id": "9bc6e519f16a4098ae2d667ed55a1479c8767a56",
+          "url": "https://github.com/Sonicadvance1/FEX/commit/3cd90b7f4630fda7f16fd165e070f41a159c9f38"
+        },
+        "date": 1602714098668,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "FEX/Scripts/Execute_FEX.py::test_povray_bench",
+            "value": 0.0775922872265713,
+            "unit": "iter/sec",
+            "range": "stddev: 0.8174621707344251",
+            "extra": "mean: 12.88787888260049 sec\nrounds: 5"
           }
         ]
       }
