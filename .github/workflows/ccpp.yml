@@ -3,10 +3,7 @@ name: Build + Test
 on:
   push:
     branches:
-      - master
-  pull_request:
-    branches:
-      - master
+      - bench_test
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -19,7 +16,7 @@ jobs:
     runs-on: ${{ matrix.arch }}
     strategy:
       matrix:
-        arch: [[self-hosted, x64], [self-hosted, ARMv8.0], [self-hosted, ARMv8.2]]
+        arch: [[self-hosted, x64]]
       fail-fast: false
 
     steps:
@@ -45,28 +42,69 @@ jobs:
       # Note the current convention is to use the -S and -B options here to specify source
       # and build directories, but this is only available with CMake 3.13 and higher.
       # The CMake binaries on the Github Actions machines are (as of this writing) 3.12
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G Ninja -DENABLE_LTO=False -DENABLE_ASSERTIONS=True
+      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE -G Ninja -DENABLE_LTO=False -DENABLE_ASSERTIONS=True -DENABLE_BENCHMARK=True
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
       shell: bash
       # Execute the build.  You can specify a specific target with "--target <NAME>"
-      run: cmake --build . --config $BUILD_TYPE
+      run: cmake --build . --config $BUILD_TYPE --target FEXLoader
 
-    - name: ASM Tests
+    - name: CI Load Test
       working-directory: ${{runner.workspace}}/build
       shell: bash
-      # Execute the unit tests
-      run: cmake --build . --config $BUILD_TYPE --target asm_tests
+      # XXX: Need to add RootFS
+      env:
+        FEXLoader: ${{runner.workspace}}/build/Bin/FEXLoader
+        FEXArgs: "-c irjit -n 500 -R /home/ryanh/ubuntu_rootfs/ --"
+        RootFS: "/home/ryanh/ubuntu_rootfs/"
+      run: pytest --benchmark-min-rounds=2 $GITHUB_WORKSPACE/Scripts/Execute_FEX.py --benchmark-json output.json
 
-    - name: IR Tests
-      working-directory: ${{runner.workspace}}/build
-      shell: bash
-      # Execute the unit tests
-      run: cmake --build . --config $BUILD_TYPE --target ir_tests
+    - name: Get Node Name
+      id: runcmd
+      run: |
+        uname -n
+        echo ::set-output name=node::$(uname -n)
 
-    - name: Posix Tests
-      working-directory: ${{runner.workspace}}/build
-      shell: bash
-      # Execute the posixtest
-      run: cmake --build . --config $BUILD_TYPE --target posix_tests
+      # Download previous benchmark result from cache (if exists)
+    - name: Download previous benchmark data
+      uses: actions/cache@v1
+      with:
+        path: ${{runner.workspace}}/cache
+        key: ${{ steps.runcmd.outputs.node }}-benchmark
+
+    - name: Run Benchmark
+      if: github.event_name == 'pull_request'
+      uses: rhysd/github-action-benchmark@v1
+      with:
+        # What benchmark tool the output.txt came from
+        tool: 'pytest'
+        # Where the output from the benchmark tool is stored
+        output-file-path: ${{runner.workspace}}/build/output.json
+        # Workflow will fail when an alert happens
+        comment-on-alert: true
+
+    - name: Store benchmark data
+      if: github.event_name == 'push'
+      uses: rhysd/github-action-benchmark@v1
+      with:
+        # What benchmark tool the output.txt came from
+        tool: 'pytest'
+        # Where the output from the benchmark tool is stored
+        output-file-path: ${{runner.workspace}}/build/output.json
+        # Where the previous data file is stored
+        external-data-json-path: ${{runner.workspace}}/cache/benchmark-data.json
+
+    - name: Update github page
+      if: github.event_name == 'push'
+      uses: rhysd/github-action-benchmark@v1
+      with:
+        # What benchmark tool the output.txt came from
+        tool: 'pytest'
+        # Where the output from the benchmark tool is stored
+        output-file-path: ${{runner.workspace}}/build/output.json
+        # Personal access token to deploy GitHub Pages branch
+        github-token: ${{ secrets.RESULTS_TOKEN }}
+        benchmark-data-dir-path: dev/bench/${{steps.runcmd.outputs.node}}/
+        # Push and deploy GitHub pages branch automatically
+        auto-push: true

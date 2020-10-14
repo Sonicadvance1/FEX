@@ -129,7 +129,10 @@ int main(int argc, char **argv, char **const envp) {
   auto Args = FEX::ArgLoader::Get();
   auto ParsedArgs = FEX::ArgLoader::GetParsedArgs();
 
-  LogMan::Throw::A(!Args.empty(), "Not enough arguments");
+  if (Args.empty()) {
+    LogMan::Msg::D("Not enough arguments");
+    return 0;
+  }
 
   FEX::HarnessHelper::ELFCodeLoader Loader{Args[0], LDPath(), Args, ParsedArgs, envp, &Environment};
 
