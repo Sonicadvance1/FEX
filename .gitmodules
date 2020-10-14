@@ -1,0 +1,23 @@
+[submodule "External/vixl"]
+	shallow = true
+	path = External/vixl
+	url = https://github.com/Sonicadvance1/vixl.git
+[submodule "External/cpp-optparse"]
+	path = External/cpp-optparse
+	url = https://github.com/Sonicadvance1/cpp-optparse
+[submodule "External/imgui"]
+	path = External/imgui
+	url = https://github.com/Sonicadvance1/imgui.git
+[submodule "External/json-maker"]
+	path = External/json-maker
+	url = https://github.com/Sonicadvance1/json-maker.git
+[submodule "External/tiny-json"]
+	path = External/tiny-json
+	url = https://github.com/Sonicadvance1/tiny-json.git
+[submodule "External/xbyak"]
+      shallow = true
+	path = External/xbyak
+	url = https://github.com/FEX-Emu/xbyak.git
+[submodule "External/fex-posixtest-bins"]
+	path = External/fex-posixtest-bins
+	url = https://github.com/FEX-Emu/fex-posixtest-bins.git
