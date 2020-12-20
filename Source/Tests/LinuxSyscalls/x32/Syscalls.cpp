@@ -12,7 +12,7 @@ namespace FEX::HLE::x32 {
   void RegisterFD();
   void RegisterFS();
   void RegisterInfo();
-  void RegisterMemory();
+  void RegisterMemory(bool Has64BitAllocator);
   void RegisterNotImplemented();
   void RegisterSched();
   void RegisterSemaphore();
@@ -64,6 +64,7 @@ public:
 
 private:
   void RegisterSyscallHandlers();
+  FEXCore::Config::Value<bool> Has64BitAllocator{FEXCore::Config::CONFIG_HAS_64BIT_ALLOCATOR, false};
 };
 
   uint32_t Unimplemented(FEXCore::Core::InternalThreadState *Thread, uint64_t SyscallNumber) {
@@ -118,7 +119,7 @@ private:
     FEX::HLE::x32::RegisterFD();
     FEX::HLE::x32::RegisterFS();
     FEX::HLE::x32::RegisterInfo();
-    FEX::HLE::x32::RegisterMemory();
+    FEX::HLE::x32::RegisterMemory(Has64BitAllocator());
     FEX::HLE::x32::RegisterNotImplemented();
     FEX::HLE::x32::RegisterSched();
     FEX::HLE::x32::RegisterSemaphore();

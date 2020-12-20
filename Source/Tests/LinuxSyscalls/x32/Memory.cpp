@@ -259,28 +259,50 @@ void *MemAllocator::mremap(void *old_address, size_t old_size, size_t new_size, 
 }
 
   static std::unique_ptr<MemAllocator> alloc{};
-  void RegisterMemory() {
-    alloc = std::make_unique<MemAllocator>();
+  void RegisterMemory(bool Has64BitAllocator) {
+    if (Has64BitAllocator) {
+      REGISTER_SYSCALL_IMPL_X32(mmap, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, int32_t offset) -> uint64_t {
+        uint64_t Result = reinterpret_cast<uint64_t>(::mmap(reinterpret_cast<void*>(addr), length, prot, flags, fd, offset));
+        SYSCALL_ERRNO();
+      });
 
-    REGISTER_SYSCALL_IMPL_X32(mmap, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, int32_t offset) -> uint64_t {
-      return (uint64_t)alloc->mmap(reinterpret_cast<void*>(addr), length, prot,flags, fd, offset);
-    });
+      REGISTER_SYSCALL_IMPL_X32(mmap2, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, uint32_t pgoffset) -> uint64_t {
+        uint64_t Result = reinterpret_cast<uint64_t>(::mmap(reinterpret_cast<void*>(addr), length, prot, flags, fd, static_cast<uint64_t>(pgoffset) * 0x1000));
+        SYSCALL_ERRNO();
+      });
 
-    REGISTER_SYSCALL_IMPL_X32(mmap2, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, int32_t pgoffset) -> uint64_t {
-      return (uint64_t)alloc->mmap(reinterpret_cast<void*>(addr), length, prot,flags, fd, pgoffset * 0x1000);
-    });
+      REGISTER_SYSCALL_IMPL_X32(munmap, [](FEXCore::Core::InternalThreadState *Thread, void *addr, size_t length) -> uint64_t {
+        uint64_t Result = ::munmap(addr, length);
+        SYSCALL_ERRNO();
+      });
 
-    REGISTER_SYSCALL_IMPL_X32(munmap, [](FEXCore::Core::InternalThreadState *Thread, void *addr, size_t length) -> uint64_t {
-      return alloc->munmap(addr, length);
-    });
+      REGISTER_SYSCALL_IMPL_X32(mremap, [](FEXCore::Core::InternalThreadState *Thread, void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) -> uint64_t {
+        uint64_t Result = reinterpret_cast<uint64_t>(::mremap(old_address, old_size, new_size, flags, new_address));
+        SYSCALL_ERRNO();
+      });
+    }
+    else {
+      alloc = std::make_unique<MemAllocator>();
+      REGISTER_SYSCALL_IMPL_X32(mmap, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, int32_t offset) -> uint64_t {
+        return (uint64_t)alloc->mmap(reinterpret_cast<void*>(addr), length, prot,flags, fd, offset);
+      });
+
+      REGISTER_SYSCALL_IMPL_X32(mmap2, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, uint32_t pgoffset) -> uint64_t {
+        return (uint64_t)alloc->mmap(reinterpret_cast<void*>(addr), length, prot,flags, fd, (uint64_t)pgoffset * 0x1000);
+      });
+
+      REGISTER_SYSCALL_IMPL_X32(munmap, [](FEXCore::Core::InternalThreadState *Thread, void *addr, size_t length) -> uint64_t {
+        return alloc->munmap(addr, length);
+      });
+
+      REGISTER_SYSCALL_IMPL_X32(mremap, [](FEXCore::Core::InternalThreadState *Thread, void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) -> uint64_t {
+        return reinterpret_cast<uint64_t>(alloc->mremap(old_address, old_size, new_size, flags, new_address));
+      });
+    }
 
     REGISTER_SYSCALL_IMPL_X32(mprotect, [](FEXCore::Core::InternalThreadState *Thread, void *addr, uint32_t len, int prot) -> uint64_t {
       uint64_t Result = ::mprotect(addr, len, prot);
       SYSCALL_ERRNO();
-    });
-
-    REGISTER_SYSCALL_IMPL_X32(mremap, [](FEXCore::Core::InternalThreadState *Thread, void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) -> uint64_t {
-      return reinterpret_cast<uint64_t>(alloc->mremap(old_address, old_size, new_size, flags, new_address));
     });
 
     REGISTER_SYSCALL_IMPL_X32(mlockall, [](FEXCore::Core::InternalThreadState *Thread, int flags) -> uint64_t {

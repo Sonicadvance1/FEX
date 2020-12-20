@@ -30,6 +30,7 @@ namespace FEXCore::Config {
     CONFIG_IS_INTERPRETER,
     CONFIG_INTERPRETER_INSTALLED,
     CONFIG_APP_FILENAME,
+    CONFIG_HAS_64BIT_ALLOCATOR,
   };
 
   enum ConfigCore {
