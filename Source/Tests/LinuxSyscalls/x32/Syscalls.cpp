@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 namespace FEX::HLE::x32 {
+  void RegisterEpoll();
   void RegisterFD();
   void RegisterFS();
   void RegisterInfo();
@@ -16,9 +17,11 @@ namespace FEX::HLE::x32 {
   void RegisterNotImplemented();
   void RegisterSched();
   void RegisterSemaphore();
+  void RegisterSignals();
   void RegisterSocket();
   void RegisterThread();
   void RegisterTime();
+  void RegisterTimer();
 
   std::map<int, const char*> SyscallNames = {
     #include "SyscallsNames.inl"
@@ -116,6 +119,7 @@ private:
     FEX::HLE::RegisterStubs();
 
     // 32bit specific
+    FEX::HLE::x32::RegisterEpoll();
     FEX::HLE::x32::RegisterFD();
     FEX::HLE::x32::RegisterFS();
     FEX::HLE::x32::RegisterInfo();
@@ -123,9 +127,11 @@ private:
     FEX::HLE::x32::RegisterNotImplemented();
     FEX::HLE::x32::RegisterSched();
     FEX::HLE::x32::RegisterSemaphore();
+    FEX::HLE::x32::RegisterSignals();
     FEX::HLE::x32::RegisterSocket();
     FEX::HLE::x32::RegisterThread();
     FEX::HLE::x32::RegisterTime();
+    FEX::HLE::x32::RegisterTimer();
 
     // Set all the new definitions
     for (auto &Syscall : syscalls_x32) {
