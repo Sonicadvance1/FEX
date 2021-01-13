@@ -66,7 +66,7 @@ public:
 
   void ClearCache() override;
 
-  static constexpr size_t INITIAL_CODE_SIZE = 1024 * 1024 * 16;
+  static constexpr size_t INITIAL_CODE_SIZE = 1024 * 1024 * 256;
   static constexpr size_t MAX_CODE_SIZE = 1024 * 1024 * 256;
 
   bool HandleSIGILL(int Signal, void *info, void *ucontext);
@@ -79,6 +79,7 @@ private:
   FEXCore::Context::Context *CTX;
   FEXCore::Core::InternalThreadState *ThreadState;
   FEXCore::IR::IRListView<true> const *IR;
+  uint64_t CurrentRIP{};
 
   std::unordered_map<IR::OrderedNodeWrapper::NodeOffsetType, Label> JumpTargets;
   Xbyak::util::Cpu Features{};

@@ -76,33 +76,11 @@ namespace FEX::HLE::x32 {
       FLAGPRINT(CLONE_NEWNET,         0x40000000);
       FLAGPRINT(CLONE_IO,             0x80000000);
 
-      if (AnyFlagsSet(flags, CLONE_UNTRACED | CLONE_PTRACE)) {
-        LogMan::Msg::D("clone: Ptrace* not supported");
-      }
+       if (!(flags & CLONE_THREAD)) {
 
-      if (AnyFlagsSet(flags, CLONE_NEWNS | CLONE_NEWCGROUP | CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET)) {
-        ERROR_AND_DIE("clone: Namespaces are not supported");
-      }
-
-      if (!(flags & CLONE_THREAD)) {
-
-        if (flags & CLONE_VFORK) {
-          flags &= ~CLONE_VFORK;
-          flags &= ~CLONE_VM;
-          LogMan::Msg::D("clone: WARNING: CLONE_VFORK w/o CLONE_THREAD");
-        }
-
-        if (AnyFlagsSet(flags, CLONE_SYSVSEM | CLONE_FS |  CLONE_FILES | CLONE_SIGHAND | CLONE_VM)) {
-          ERROR_AND_DIE("clone: Unsuported flags w/o CLONE_THREAD (Shared Resources), %X", flags);
-        }
-
-        // CLONE_PARENT is ignored (Implied by CLONE_THREAD)
+         // CLONE_PARENT is ignored (Implied by CLONE_THREAD)
         return FEX::HLE::ForkGuest(Thread, flags, stack, parent_tid, child_tid, tls);
       } else {
-
-        if (!AllFlagsSet(flags, CLONE_SYSVSEM | CLONE_FS |  CLONE_FILES | CLONE_SIGHAND)) {
-          ERROR_AND_DIE("clone: CLONE_THREAD: Unsuported flags w/ CLONE_THREAD (Shared Resources), %X", flags);
-        }
 
         auto NewThread = FEX::HLE::CreateNewThread(Thread, flags, stack, parent_tid, child_tid, tls);
 

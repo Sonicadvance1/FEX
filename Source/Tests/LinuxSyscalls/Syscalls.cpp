@@ -20,18 +20,13 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-#define BRK_SIZE 0x1000'0000
-
 namespace FEX::HLE {
 SyscallHandler *_SyscallHandler{};
 
 uint64_t SyscallHandler::HandleBRK(FEXCore::Core::InternalThreadState *Thread, void *Addr) {
   std::lock_guard<std::mutex> lk(MMapMutex);
-  uint64_t Result;
 
-  if (DataSpace == 0) {
-    DefaultProgramBreak(Thread);
-  }
+  uint64_t Result;
 
   if (Addr == nullptr) { // Just wants to get the location of the program break atm
     Result = DataSpace + DataSpaceSize;
@@ -46,10 +41,38 @@ uint64_t SyscallHandler::HandleBRK(FEXCore::Core::InternalThreadState *Thread, v
     }
     else {
       uint64_t NewSize = NewEnd - DataSpace;
+      uint64_t NewSizeAligned = AlignUp(NewSize, 4096);
 
-      // make sure we don't overflow to TLS storage
-      if (NewSize >= BRK_SIZE)
-        return -ENOMEM;
+      if (NewSizeAligned < DataSpaceMaxSize) {
+        // If we are shrinking the brk then munmap the ranges
+        // That way we gain the memory back and also give the application zero pages if it allocates again
+        // DataspaceMaxSize is always page aligned
+
+        uint64_t RemainingSize = DataSpaceMaxSize - NewSizeAligned;
+        // We have pages we can unmap
+        munmap((void*)(DataSpace + NewSizeAligned), RemainingSize);
+        DataSpaceMaxSize = NewSizeAligned;
+      }
+      else if (NewSize >= DataSpaceMaxSize) {
+        constexpr static uint64_t SizeAlignment = 8 * 1024 * 1024;
+        uint64_t AllocateNewSize = AlignUp(NewSize, SizeAlignment) - DataSpaceMaxSize;
+        if (!Is64BitMode() &&
+          (DataSpace + DataSpaceMaxSize + AllocateNewSize > 0x1'0000'0000ULL)) {
+          // If we are 32bit and we tried going about the 32bit limit then out of memory
+          return DataSpace + DataSpaceSize;
+        }
+
+        uint64_t NewBRK = (uint64_t)mmap((void*)(DataSpace + DataSpaceMaxSize), AllocateNewSize, PROT_READ | PROT_WRITE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+        if (NewBRK == ~0ULL) {
+          // If we couldn't allocate a new region then out of memory
+          return DataSpace + DataSpaceSize;
+        }
+        else {
+          // Increase our BRK size
+          DataSpaceMaxSize += AllocateNewSize;
+        }
+      }
 
       DataSpaceSize = NewSize;
     }
@@ -58,9 +81,37 @@ uint64_t SyscallHandler::HandleBRK(FEXCore::Core::InternalThreadState *Thread, v
   return Result;
 }
 
-void SyscallHandler::DefaultProgramBreak(FEXCore::Core::InternalThreadState *Thread) {
-  DataSpaceSize = 0;
-  DataSpace = (uint64_t)mmap(nullptr, BRK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+void SyscallHandler::DefaultProgramBreak(uint64_t Base, uint64_t Size) {
+  if (Base == 0) {
+    constexpr size_t BRK_SIZE = 8 * 1024 * 1024;
+  //#define MAP_32BIT 0
+    // XXX: If MAP_32BIT then steam breaks....?
+    if (Is64BitMode()) {
+      DataSpace = (uint64_t)mmap(nullptr, BRK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    }
+    else {
+      DataSpace = (uint64_t)mmap((void*)0x1000, BRK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      LogMan::Msg::D("32bit BRK: 0x%lx'%lx", DataSpace >> 32, DataSpace & ~0U);
+    }
+
+    if (DataSpace == ~0ULL) {
+      ERROR_AND_DIE("Couldn't allocate");
+    }
+    if (DataSpace >> 32 && !Is64BitMode()) {
+      ERROR_AND_DIE("BRK in upper 32bits");
+    }
+    DataSpaceMaxSize = BRK_SIZE;
+  }
+  else {
+    DataSpace = Base;
+    DataSpaceMaxSize = Size;
+    if (Is64BitMode()) {
+    }
+    else {
+      LogMan::Msg::D("32bit BRK: 0x%lx'%lx", DataSpace >> 32, DataSpace & ~0U);
+    }
+
+  }
 }
 
 SyscallHandler::SyscallHandler(FEXCore::Context::Context *ctx, FEX::HLE::SignalDelegator *_SignalDelegation)
@@ -95,6 +146,17 @@ uint64_t SyscallHandler::HandleSyscall(FEXCore::Core::InternalThreadState *Threa
 
 #ifdef DEBUG_STRACE
 void SyscallHandler::Strace(FEXCore::HLE::SyscallArguments *Args, uint64_t Ret) {
+  //if (Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_clock_gettime64 ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_time ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_socketcall ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86__newselect ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_gettid ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_poll ||
+  //    Args->Argument[0] == FEX::HLE::x32::SYSCALL_x86_ppoll ||
+  //    0
+  //    ) {
+  //  return;
+  //}
   auto &Def = Definitions[Args->Argument[0]];
   switch (Def.NumArgs) {
     case 0: LogMan::Msg::D(Def.StraceFmt.c_str(), Ret); break;
@@ -105,6 +167,9 @@ void SyscallHandler::Strace(FEXCore::HLE::SyscallArguments *Args, uint64_t Ret) 
     case 5: LogMan::Msg::D(Def.StraceFmt.c_str(), Args->Argument[1], Args->Argument[2], Args->Argument[3], Args->Argument[4], Args->Argument[5], Ret); break;
     case 6: LogMan::Msg::D(Def.StraceFmt.c_str(), Args->Argument[1], Args->Argument[2], Args->Argument[3], Args->Argument[4], Args->Argument[5], Args->Argument[6], Ret); break;
     default: break;
+  }
+  if (Ret > -4096) {
+    LogMan::Msg::D("\tError: %d '%s'", -Ret, strerror(-Ret));
   }
 }
 #endif

@@ -18,11 +18,12 @@ DEF_OP(CASPair) {
     mov(TMP4, Expected.second);
 
     switch (OpSize) {
-    case 4:
+    case 4: {
       caspal(TMP3.W(), TMP4.W(), Desired.first.W(), Desired.second.W(), MemOperand(MemSrc));
       mov(Dst.first.W(), TMP3.W());
       mov(Dst.second.W(), TMP4.W());
       break;
+    }
     case 8:
       caspal(TMP3.X(), TMP4.X(), Desired.first.X(), Desired.second.X(), MemOperand(MemSrc));
       mov(Dst.first, TMP3);

@@ -112,6 +112,8 @@ public:
 
   // Dispatch builder functions
 #define OpcodeArgs [[maybe_unused]] FEXCore::X86Tables::DecodedOp Op
+
+  void DoSyscall(OpcodeArgs, bool Is64Bit);
   void UnhandledOp(OpcodeArgs);
   template<uint32_t SrcIndex>
   void MOVGPROp(OpcodeArgs);
@@ -474,9 +476,10 @@ public:
   void SetMultiblock(bool _Multiblock) { Multiblock = _Multiblock; }
   bool GetMultiblock() { return Multiblock; }
 
+  FEXCore::IR::IROp_IRHeader *Current_Header{};
+
 private:
   bool DecodeFailure{false};
-  FEXCore::IR::IROp_IRHeader *Current_Header{};
 
   OrderedNode *AppendSegmentOffset(OrderedNode *Value, uint32_t Flags, uint32_t DefaultPrefix = 0, bool Override = false);
 

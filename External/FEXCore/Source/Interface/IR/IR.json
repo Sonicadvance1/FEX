@@ -610,6 +610,9 @@
         "Arg3",
         "Arg4",
         "Arg5"
+      ],
+      "Args": [
+        "bool", "Is64Bit"
       ]
     },
 

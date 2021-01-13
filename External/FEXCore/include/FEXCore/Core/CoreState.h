@@ -40,6 +40,8 @@ namespace FEXCore::Core {
      */
     uint64_t ReturningStackLocation{};
 
+    uint64_t StackPivot{};
+
     FEXCore::HLE::ThreadManagement ThreadManager;
   };
   static_assert(offsetof(ThreadState, State) == 0, "CPUState must be first member in threadstate");

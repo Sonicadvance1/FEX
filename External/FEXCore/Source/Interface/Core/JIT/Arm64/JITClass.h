@@ -93,7 +93,7 @@ public:
   void ClearCache() override;
 
   bool HandleSIGILL(int Signal, void *info, void *ucontext);
-  bool HandleSIGBUS(int Signal, void *info, void *ucontext);
+  bool HandleSIGBUS(uint64_t RIP, int Signal, void *info, void *ucontext);
   bool HandleSignalPause(int Signal, void *info, void *ucontext);
   bool HandleGuestSignal(int Signal, void *info, void *ucontext, GuestSigAction *GuestAction, stack_t *GuestStack);
 
@@ -223,6 +223,7 @@ private:
 
   void StoreThreadState(int Signal, void *ucontext);
   void RestoreThreadState(void *ucontext);
+  std::stack<uint64_t> SignalFrames;
   /**  @} */
 
   struct CompilerSharedData {

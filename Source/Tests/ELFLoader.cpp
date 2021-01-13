@@ -1,6 +1,8 @@
 #include "Common/ArgumentLoader.h"
+#include "Common/ArenaAllocator.h"
 #include "Common/EnvironmentLoader.h"
 #include "Common/Config.h"
+#include "Common/StringUtil.h"
 #include "HarnessHelpers.h"
 #include "Tests/LinuxSyscalls/Syscalls.h"
 #include "Tests/LinuxSyscalls/SignalDelegator.h"
@@ -11,9 +13,13 @@
 #include <FEXCore/Utils/ELFLoader.h>
 #include <FEXCore/Utils/LogManager.h>
 
+#include <OSAllocator.h>
+
 #include <cstdint>
 #include <filesystem>
+#include <malloc.h>
 #include <string>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -141,6 +147,7 @@ bool RanAsInterpreter(char *Program) {
 }
 
 bool IsInterpreterInstalled() {
+  return false;
   // The interpreter is installed if both the binfmt_misc handlers are available
   return std::filesystem::exists("/proc/sys/fs/binfmt_misc/FEX-x86") &&
          std::filesystem::exists("/proc/sys/fs/binfmt_misc/FEX-x86_64");
@@ -190,6 +197,7 @@ int main(int argc, char **argv, char **const envp) {
   FEXCore::Config::ReloadMetaLayer();
   FEXCore::Config::Set(FEXCore::Config::CONFIG_IS_INTERPRETER, IsInterpreter ? "1" : "0");
   FEXCore::Config::Set(FEXCore::Config::CONFIG_INTERPRETER_INSTALLED, IsInterpreterInstalled() ? "1" : "0");
+  FEXCore::Config::Set(FEXCore::Config::CONFIG_HAS_64BIT_ALLOCATOR, "0");
 
   FEXCore::Config::Value<uint8_t> CoreConfig{FEXCore::Config::CONFIG_DEFAULTCORE, 0};
   FEXCore::Config::Value<uint64_t> BlockSizeConfig{FEXCore::Config::CONFIG_MAXBLOCKINST, 1};
@@ -207,7 +215,6 @@ int main(int argc, char **argv, char **const envp) {
   FEXCore::Config::Value<bool> ABILocalFlags{FEXCore::Config::CONFIG_ABI_LOCAL_FLAGS, false};
   FEXCore::Config::Value<bool> AbiNoPF{FEXCore::Config::CONFIG_ABI_NO_PF, false};
 
-
   ::SilentLog = SilentLog();
 
   if (!::SilentLog) {
@@ -224,6 +231,7 @@ int main(int argc, char **argv, char **const envp) {
   }
 
   InterpreterHandler(&Program, LDPath(), &Args);
+  LogMan::Msg::D("Executing program: '%s' LDPath: '%s'", Program.c_str(), LDPath().c_str());
 
   if (!std::filesystem::exists(Program)) {
     // Early exit if the program passed in doesn't exist
@@ -232,7 +240,21 @@ int main(int argc, char **argv, char **const envp) {
     return 0;
   }
 
-  FEX::HarnessHelper::ELFCodeLoader Loader{Program, LDPath(), Args, ParsedArgs, envp, &Environment};
+  FEX::HarnessHelper::ELFCodeLoader *_Loader = new FEX::HarnessHelper::ELFCodeLoader{Program, LDPath(), Args, ParsedArgs, envp, &Environment};
+  FEX::HarnessHelper::ELFCodeLoader &Loader = *_Loader;
+
+  Alloc::HostAllocator *Alloc64{};
+//  if (!Loader.Is64BitMode())
+//  {
+//    malloc_trim(0);
+//    //auto Alloc32 = Alloc::OSAllocator::Create32BitAllocator();
+//    Alloc64 = Alloc::OSAllocator::Create64BitAllocator();
+//    //delete Alloc32;
+//  }
+
+  if (Alloc64) {
+    FEXCore::Config::EraseSet(FEXCore::Config::CONFIG_HAS_64BIT_ALLOCATOR, "1");
+  }
 
   FEXCore::Context::InitializeStaticTables(Loader.Is64BitMode() ? FEXCore::Context::MODE_64BIT : FEXCore::Context::MODE_32BIT);
   auto CTX = FEXCore::Context::CreateNewContext();
@@ -261,6 +283,8 @@ int main(int argc, char **argv, char **const envp) {
       CTX,
       SignalDelegation.get(),
       &Loader)};
+  auto BRKInfo = Loader.GetBRKInfo();
+  SyscallHandler->DefaultProgramBreak(BRKInfo.Base, BRKInfo.Size);
 
   FEXCore::Context::SetSignalDelegator(CTX, SignalDelegation.get());
   FEXCore::Context::SetSyscallHandler(CTX, SyscallHandler.get());
@@ -282,7 +306,7 @@ int main(int argc, char **argv, char **const envp) {
 
   auto ProgramStatus = FEXCore::Context::GetProgramStatus(CTX);
 
-  FEXCore::Context::DestroyContext(CTX);
+//  FEXCore::Context::DestroyContext(CTX);
 
   FEXCore::Config::Shutdown();
 

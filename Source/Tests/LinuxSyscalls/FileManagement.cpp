@@ -140,6 +140,10 @@ uint64_t FileManager::Readlinkat(int dirfd, const char *pathname, char *buf, siz
 }
 
 uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char *pathname, int flags, uint32_t mode) {
+  if (strcmp(pathname , "/etc/ld.so.cache") == 0) {
+    return -ENOENT;
+  }
+
   int32_t fd = -1;
 
   fd = EmuFD.OpenAt(dirfs, pathname, flags, mode);
@@ -153,8 +157,8 @@ uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char *pathname, i
       fd = ::openat(dirfs, pathname, flags, mode);
   }
 
-  if (fd != -1)
-    FDToNameMap[fd] = pathname;
+//  if (fd != -1)
+//    FDToNameMap[fd] = pathname;
 
   return fd;
 }

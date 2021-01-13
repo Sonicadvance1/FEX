@@ -20,10 +20,17 @@ bool SyscallOptimization::Run(IREmitter *IREmit) {
   for (auto [CodeNode, IROp] : CurrentIR.GetAllCode()) {
 
     if (IROp->Op == FEXCore::IR::OP_SYSCALL) {
+      auto Op = IROp->C<IR::IROp_Syscall>();
       // Is the first argument a constant?
       uint64_t Constant;
       if (IREmit->IsValueConstant(IROp->Args[0], &Constant)) {
-        auto SyscallDef = Manager->SyscallHandler->GetSyscallABI(Constant);
+        HLE::SyscallABI SyscallDef{};
+        if (Op->Is64Bit) {
+          SyscallDef = Manager->SyscallHandler64->GetSyscallABI(Constant);
+        }
+        else {
+          SyscallDef = Manager->SyscallHandler32->GetSyscallABI(Constant);
+        }
         // XXX: Once we have the ability to do real function calls then we can call directly in to the syscall handler
         if (SyscallDef.NumArgs < FEXCore::HLE::SyscallArguments::MAX_ARGS) {
           // If the number of args are less than what the IR op supports then we can remove arg usage

@@ -9,15 +9,15 @@ using namespace vixl;
 using namespace vixl::aarch64;
 #define DEF_OP(x) void JITCore::Op_##x(FEXCore::IR::IROp_Header *IROp, uint32_t Node)
 DEF_OP(GuestCallDirect) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(GuestCallIndirect) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(GuestReturn) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(SignalReturn) {
@@ -177,7 +177,12 @@ DEF_OP(Syscall) {
   }
   str(lr,       MemOperand(sp, 7 * 8 + RA64.size() * 8 + 0 * 8));
 
-  LoadConstant(x0, reinterpret_cast<uint64_t>(CTX->SyscallHandler));
+  if (Op->Is64Bit) {
+    LoadConstant(x0, reinterpret_cast<uint64_t>(CTX->SyscallHandler64));
+  }
+  else {
+    LoadConstant(x0, reinterpret_cast<uint64_t>(CTX->SyscallHandler32));
+  }
   mov(x1, STATE);
   mov(x2, sp);
 

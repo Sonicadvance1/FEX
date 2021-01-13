@@ -160,7 +160,12 @@ DEF_OP(Syscall) {
   }
 
   mov(rsi, STATE); // Move thread in to rsi
-  mov(rdi, reinterpret_cast<uint64_t>(CTX->SyscallHandler));
+  if (Op->Is64Bit) {
+    mov(rdi, reinterpret_cast<uint64_t>(CTX->SyscallHandler64));
+  }
+  else {
+    mov(rdi, reinterpret_cast<uint64_t>(CTX->SyscallHandler32));
+  }
   mov(rdx, rsp);
 
   mov(rax, reinterpret_cast<uint64_t>(FEXCore::Context::HandleSyscall));

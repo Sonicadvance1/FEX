@@ -51,7 +51,7 @@ DEF_OP(VCastFromGPR) {
 }
 
 DEF_OP(Float_FromGPR_U) {
-  LogMan::Msg::A("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(Float_FromGPR_S) {

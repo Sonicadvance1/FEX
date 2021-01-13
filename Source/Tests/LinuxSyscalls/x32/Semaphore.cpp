@@ -10,6 +10,9 @@
 #include <sys/types.h>
 
 namespace FEX::HLE::x32 {
+  uint64_t Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress);
+  uint64_t Shmdt(const void* shmaddr);
+
   // Define the IPC ops
   enum IPCOp {
     OP_SEMOP      = 1,
@@ -688,23 +691,11 @@ namespace FEX::HLE::x32 {
         break;
       }
       case OP_SHMAT: {
-        Result = reinterpret_cast<uint64_t>(shmat(first, reinterpret_cast<const void*>(ptr), second));
-        if (Result != -1) {
-          uint32_t SmallRet = Result >> 32;
-          if (!(SmallRet == 0 ||
-                SmallRet == ~0U)) {
-            LogMan::Msg::A("Syscall returning something with data in the upper 32bits! BUG!");
-            return -ENOMEM;
-          }
-
-          *reinterpret_cast<uint32_t*>(third) = static_cast<uint32_t>(Result);
-          // Zero return on success
-          Result = 0;
-        }
+        Result = FEX::HLE::x32::Shmat(first, reinterpret_cast<const void*>(ptr), second, reinterpret_cast<uint32_t*>(third));
         break;
       }
       case OP_SHMDT: {
-        Result = ::shmdt(reinterpret_cast<void*>(ptr));
+        Result = FEX::HLE::x32::Shmdt(reinterpret_cast<void*>(ptr));
         break;
       }
       case OP_SHMGET: {

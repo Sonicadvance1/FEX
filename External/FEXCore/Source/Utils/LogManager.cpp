@@ -2,6 +2,8 @@
 #include <sstream>
 #include <vector>
 
+#include <signal.h>
+
 namespace LogMan {
 
 namespace Throw {
@@ -23,6 +25,7 @@ void InstallHandler(ThrowHandler Handler) { Handlers.emplace_back(Handler); }
     Handler(Buffer);
   }
 
+  kill(0, SIGILL);
   __builtin_trap();
 }
 } // namespace Throw

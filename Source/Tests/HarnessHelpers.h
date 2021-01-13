@@ -2,6 +2,10 @@
 #include "Common/Config.h"
 #include "Common/MathUtils.h"
 
+#include "Tests/LinuxSyscalls/x32/Thread.h"
+#include "Tests/LinuxSyscalls/x64/Thread.h"
+#include "Tests/VDSO_Generator.h"
+
 #include <FEXCore/Core/CodeLoader.h>
 #include <bitset>
 #include <cassert>
@@ -12,6 +16,7 @@
 #include <FEXCore/Core/CodeLoader.h>
 #include <FEXCore/Core/CoreState.h>
 #include <FEXCore/Core/X86Enums.h>
+#include <FEXCore/Debug/InternalThreadState.h>
 #include <FEXCore/Utils/LogManager.h>
 #include <FEXCore/Utils/ELFLoader.h>
 #include <FEXCore/Utils/ELFSymbolDatabase.h>
@@ -449,6 +454,19 @@ public:
       // If the file isn't static then we need to add the filename of interpreter
       // to the front of the argument list
       Args.emplace(Args.begin(), File.InterpreterLocation());
+      LogMan::Msg::D("Interpreter: '%s'", File.InterpreterLocation().c_str());
+    }
+
+    if (File.GetMode() == ELFLoader::ELFContainer::MODE_32BIT && !File.HasDynamicLinker()) {
+      VDSOGen.Initialize(File.GetMode() == ELFLoader::ELFContainer::ELFMode::MODE_64BIT);
+
+      // VDSO mapping
+#ifndef MAP_32BIT
+#define MAP_32BIT 0
+#endif
+      void* VDSO = mmap(nullptr, VDSOGen.GetSize(), PROT_READ | PROT_WRITE, MAP_32BIT | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      VDSOGen.SetBase(reinterpret_cast<uint64_t>(VDSO));
+      LogMan::Msg::D("VDSO base: 0x%lx", VDSO);
     }
 
     if (!!envp) {
@@ -500,8 +518,14 @@ public:
     }
     else {
       AuxVariables.emplace_back(auxv_t{4, 0x20}); // AT_PHENT
-      AuxVariables.emplace_back(auxv_t{32, 0ULL}); // sysinfo (vDSO)
-      AuxVariables.emplace_back(auxv_t{33, 0ULL}); // sysinfo (vDSO)
+      if (VDSOGen.GetSize()) {
+        AuxVariables.emplace_back(auxv_t{32, VDSOGen.GetBase() + 0x540}); // AT_SYSINFO - Entry point to syscall
+        AuxVariables.emplace_back(auxv_t{33, VDSOGen.GetBase()}); // AT_SYSINFO_EHDR - Address of the start of VDSO
+      }
+      else {
+        AuxVariables.emplace_back(auxv_t{32, 0}); // AT_SYSINFO - Entry point to syscall
+        AuxVariables.emplace_back(auxv_t{33, 0}); // AT_SYSINFO_EHDR - Address of the start of VDSO
+      }
     }
 
     AuxVariables.emplace_back(auxv_t{3, DB.GetElfBase()}); // Program header
@@ -695,8 +719,8 @@ public:
   }
 
   void MapMemoryRegion() override {
-    auto DoMMap = [](uint64_t Address, size_t Size) -> void* {
-      void *Result = mmap(reinterpret_cast<void*>(Address), Size, PROT_READ | PROT_WRITE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    auto DoMMap = [](uint64_t Address, size_t Size, bool FixedNoReplace) -> void* {
+      void *Result = mmap(reinterpret_cast<void*>(Address), Size, PROT_READ | PROT_WRITE, (FixedNoReplace ? MAP_FIXED_NOREPLACE : MAP_FIXED) | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
       LogMan::Throw::A(Result != (void*)~0ULL, "Couldn't mmap");
       return Result;
     };
@@ -709,6 +733,10 @@ public:
       memcpy(reinterpret_cast<void*>(Addr), Data, Size);
     };
     DB.WriteLoadableSections(ELFLoaderWrapper);
+
+    if (VDSOGen.GetSize()) {
+      memcpy(reinterpret_cast<void*>(VDSOGen.GetBase()), VDSOGen.Data(), VDSOGen.GetSize());
+    }
   }
 
   char const *FindSymbolNameInRange(uint64_t Address) override {
@@ -733,9 +761,17 @@ public:
 
   bool Is64BitMode() const { return File.GetMode() == ::ELFLoader::ELFContainer::MODE_64BIT; }
 
+  ::ELFLoader::ELFContainer::BRKInfo GetBRKInfo() const {
+    auto Info = File.GetBRKInfo();
+    Info.Base += DB.GetElfBase();
+    return Info;
+  }
+
 private:
   ::ELFLoader::ELFContainer File;
   ::ELFLoader::ELFSymbolDatabase DB;
+
+  FEX::VDSOGenerator VDSOGen{};
   std::vector<std::string> Args;
   std::vector<std::string> EnvironmentVariables;
   std::vector<char const*> LoaderArgs;

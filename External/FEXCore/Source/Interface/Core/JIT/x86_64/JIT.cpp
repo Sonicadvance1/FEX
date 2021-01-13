@@ -630,6 +630,7 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
 
 	void *Entry = getCurr<void*>();
   this->IR = IR;
+  this->CurrentRIP = HeaderOp->Entry;
 
   LogMan::Throw::A(RAPass->HasFullRA(), "Needs RA");
 
@@ -769,6 +770,8 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
   if (DebugData) {
     DebugData->HostCodeSize = reinterpret_cast<uintptr_t>(Exit) - reinterpret_cast<uintptr_t>(Entry);
   }
+
+//  LogMan::Msg::D("RIP: %p: disas %p,%p", HeaderOp->Entry, Entry, Exit);
   return Entry;
 }
 
@@ -834,6 +837,7 @@ void JITCore::CreateCustomDispatch(FEXCore::Core::InternalThreadState *Thread) {
   // Save this stack pointer so we can cleanly shutdown the emulation with a long jump
   // regardless of where we were in the stack
   mov(qword [STATE + offsetof(FEXCore::Core::ThreadState, ReturningStackLocation)], rsp);
+//  mov(rsp, qword [STATE + offsetof(FEXCore::Core::ThreadState, StackPivot)]);
 
   Label LoopTop;
   Label NoBlock;

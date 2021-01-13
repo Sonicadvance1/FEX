@@ -7,6 +7,7 @@ if(NOT CMAKE_ASM_NASM_COMPILER_LOADED)
 endif()
 
 set(SYSCALL_SRCS
+  VDSO_Generator.cpp
   LinuxSyscalls/FileManagement.cpp
   LinuxSyscalls/EmulatedFiles/EmulatedFiles.cpp
   LinuxSyscalls/SignalDelegator.cpp
@@ -59,8 +60,18 @@ set(SYSCALL_SRCS
   LinuxSyscalls/Syscalls/NotImplemented.cpp
   LinuxSyscalls/Syscalls/Stubs.cpp
   )
-set(LIBS FEXCore Common CommonCore pthread)
+
+set(LIBS FEXCore Common CommonCore pthread Allocator)
 set(NAME FEXLoader)
+set(SRCS ELFLoader.cpp ${SYSCALL_SRCS})
+
+add_executable(${NAME} ${SRCS})
+target_include_directories(${NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source/)
+
+target_link_libraries(${NAME} ${LIBS})
+
+set(LIBS FEXCore Common CommonCore pthread Allocator)
+set(NAME FEXInterpreter)
 set(SRCS ELFLoader.cpp ${SYSCALL_SRCS})
 
 add_executable(${NAME} ${SRCS})

@@ -4,6 +4,10 @@
 #include <vector>
 
 namespace FEXCore {
+namespace Core {
+  struct InternalThreadState;
+}
+
 namespace IR {
 class IREmitter;
 }
@@ -73,6 +77,8 @@ public:
 
   using IRHandler = std::function<void(uint64_t Addr, FEXCore::IR::IREmitter *IR)>;
   virtual void AddIR(IRHandler Handler) {}
+
+  virtual void InitializeThreadState(FEXCore::Core::InternalThreadState *Thread) {}
 };
 
 

@@ -2,11 +2,15 @@
 #include "Tests/LinuxSyscalls/x32/Syscalls.h"
 
 #include "Common/MathUtils.h"
+#include <FEXCore/Utils/LogManager.h>
 
 #include <bitset>
+#include <map>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/mman.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 namespace FEX::HLE::x32 {
 class MemAllocator {
@@ -25,19 +29,54 @@ public:
     }
     // Take the top page as well
     MappedPages.set(TOP_KEY);
+    if (SearchDown) {
+      LastScanLocation = TOP_KEY;
+      LastKeyLocation = TOP_KEY;
+      FindPageRangePtr = &MemAllocator::FindPageRange_TopDown;
+    }
+    else {
+      LastScanLocation = BASE_KEY;
+      LastKeyLocation = BASE_KEY;
+      FindPageRangePtr = &MemAllocator::FindPageRange;
+    }
   }
   void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
   int munmap(void *addr, size_t length);
   void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
+  uint64_t Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress);
+  uint64_t Shmdt(const void* shmaddr);
+  static constexpr bool SearchDown = true;
+
+  // PageAddr is a page already shifted to page index
+  // PagesLength is the number of pages
+  void SetUsedPages(uint64_t PageAddr, size_t PagesLength) {
+    // Set the range as mapped
+    for (size_t i = 0; i < PagesLength; ++i) {
+      MappedPages.set(PageAddr + i);
+    }
+  }
+
+  // PageAddr is a page already shifted to page index
+  // PagesLength is the number of pages
+  void SetFreePages(uint64_t PageAddr, size_t PagesLength) {
+    // Set the range as unused
+    for (size_t i = 0; i < PagesLength; ++i) {
+      MappedPages.reset(PageAddr + i);
+    }
+  }
 
 private:
   // Set that contains 4k mapped pages
   // This is the full 32bit memory range
   std::bitset<0x10'0000> MappedPages;
-  uint64_t LastScanLocation = BASE_KEY;
+  std::map<uint32_t, int> PageToShm{};
+  uint64_t LastScanLocation{};
+  uint64_t LastKeyLocation{};
   std::mutex AllocMutex{};
   uint64_t FindPageRange(uint64_t Start, size_t Pages);
   uint64_t FindPageRange_TopDown(uint64_t Start, size_t Pages);
+  using FindHandler = uint64_t(MemAllocator::*)(uint64_t Start, size_t Pages);
+  FindHandler FindPageRangePtr{};
 };
 
 uint64_t MemAllocator::FindPageRange(uint64_t Start, size_t Pages) {
@@ -66,25 +105,23 @@ uint64_t MemAllocator::FindPageRange(uint64_t Start, size_t Pages) {
 
 uint64_t MemAllocator::FindPageRange_TopDown(uint64_t Start, size_t Pages) {
   // Linear range scan
-  Start -= Pages;
-  while (Start != BASE_KEY) {
+  while (Start >= BASE_KEY &&
+         Start <= TOP_KEY) {
     bool Free = true;
-    if (Start < BASE_KEY) {
-      return 0;
-    }
 
     uint64_t Offset = 0;
     for (; Offset < Pages; ++Offset) {
-      if (MappedPages.test(Start + Offset)) {
+      if (MappedPages.test(Start - Offset)) {
         Free = false;
         break;
       }
     }
 
     if (Free) {
-      return Start;
+      //LogMan::Msg::D("Allocated pages at: [0x%lx, 0x%lx)", (Start - Offset) << PAGE_SHIFT, (Start - Offset + Pages) << PAGE_SHIFT);
+      return Start - Offset;
     }
-    Start -= (Pages - Offset) + 1;
+    Start -= Offset + 1;
   }
 
   return 0;
@@ -95,7 +132,7 @@ void *MemAllocator::mmap(void *addr, size_t length, int prot, int flags, int fd,
   size_t PagesLength = AlignUp(length, PAGE_SIZE) >> PAGE_SHIFT;
 
   uintptr_t Addr = reinterpret_cast<uintptr_t>(addr);
-  uintptr_t PageAddr = AlignUp(Addr, PAGE_SIZE) >> PAGE_SHIFT;
+  uintptr_t PageAddr = Addr >> PAGE_SHIFT;
 
   uintptr_t PageEnd = PageAddr + PagesLength;
 
@@ -136,15 +173,16 @@ void *MemAllocator::mmap(void *addr, size_t length, int prot, int flags, int fd,
 restart:
     {
       // Linear range scan
-      uint64_t LowerPage = FindPageRange(BottomPage, PagesLength);
+      uint64_t LowerPage = (this->*FindPageRangePtr)(BottomPage, PagesLength);
       if (LowerPage == 0) {
         // Try again but this time from the start
-        BottomPage = BASE_KEY;
-        LowerPage = FindPageRange(BottomPage, PagesLength);
+        BottomPage = LastKeyLocation;
+        LowerPage = (this->*FindPageRangePtr)(BottomPage, PagesLength);
       }
 
       uint64_t UpperPage = LowerPage + PagesLength;
       if (LowerPage == 0) {
+        LogMan::Msg::E("@@@@@ mmap no mem!");
         return (void*)(uintptr_t)-ENOMEM;
       }
       {
@@ -170,16 +208,23 @@ restart:
           }
           else {
             // Try again
-            BottomPage += PagesLength;
+            if (SearchDown) {
+              BottomPage -= PagesLength;
+            }
+            else {
+              BottomPage += PagesLength;
+            }
             goto restart;
           }
         }
         else {
-          LastScanLocation = UpperPage;
-          // Set the range as mapped
-          for (size_t i = 0; i < PagesLength; ++i) {
-            MappedPages.set(LowerPage + i);
+          if (SearchDown) {
+            LastScanLocation = LowerPage;
           }
+          else {
+            LastScanLocation = UpperPage;
+          }
+          SetUsedPages(LowerPage, PagesLength);
           return MappedPtr;
         }
       }
@@ -195,9 +240,7 @@ restart:
       offset);
 
     if (MappedPtr != MAP_FAILED) {
-      for (size_t i = 0; i < PagesLength; ++i) {
-        MappedPages.set(PageAddr + i);
-      }
+      SetUsedPages(PageAddr, PagesLength);
       return MappedPtr;
     }
     else {
@@ -253,12 +296,258 @@ int MemAllocator::munmap(void *addr, size_t length) {
 }
 
 void *MemAllocator::mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) {
+  size_t OldPagesLength = AlignUp(old_size, PAGE_SIZE) >> PAGE_SHIFT;
+  size_t NewPagesLength = AlignUp(new_size, PAGE_SIZE) >> PAGE_SHIFT;
+
+  {
+    std::scoped_lock<std::mutex> lk{AllocMutex};
+    if (flags & MREMAP_FIXED) {
+      void *MappedPtr = ::mremap(old_address, old_size, new_size, flags, new_address);
+
+      if (MappedPtr != MAP_FAILED) {
+        if (!(flags & MREMAP_DONTUNMAP)) {
+          // Unmap the old location
+          uintptr_t OldAddr = reinterpret_cast<uintptr_t>(old_address);
+          SetFreePages(OldAddr >> PAGE_SHIFT, OldPagesLength);
+        }
+
+        // Map the new pages
+        uintptr_t NewAddr = reinterpret_cast<uintptr_t>(MappedPtr);
+        SetUsedPages(NewAddr >> PAGE_SHIFT, NewPagesLength);
+      }
+      else {
+        LogMan::Msg::E("@@@@@ %d mremap failed! '%s'", __LINE__, strerror(-errno));
+        return (void*)(uintptr_t)-errno;
+      }
+    }
+    else {
+      uintptr_t OldAddr = reinterpret_cast<uintptr_t>(old_address);
+      uintptr_t OldPageAddr = OldAddr >> PAGE_SHIFT;
+
+      if (NewPagesLength < OldPagesLength) {
+        void *MappedPtr = ::mremap(old_address, old_size, new_size, flags & ~MREMAP_MAYMOVE);
+
+        if (MappedPtr != MAP_FAILED) {
+          // Clear the pages that we just shrunk
+          size_t NewPagesLength = AlignUp(new_size, PAGE_SIZE) >> PAGE_SHIFT;
+          uintptr_t NewPageAddr = reinterpret_cast<uintptr_t>(MappedPtr) >> PAGE_SHIFT;
+          SetFreePages(NewPageAddr + NewPagesLength, OldPagesLength - NewPagesLength);
+          return MappedPtr;
+        }
+        else {
+          LogMan::Msg::E("@@@@@ %d mremap failed! '%s'", __LINE__, strerror(-errno));
+          return (void*)(uintptr_t)-errno;
+        }
+      }
+      else {
+        // Scan the region forward from our first region's endd to see if it can be extended
+        bool CanExtend{true};
+
+        for (size_t i = OldPagesLength; i < NewPagesLength; ++i) {
+          if (MappedPages[OldPageAddr + i]) {
+            CanExtend = false;
+            break;
+          }
+        }
+
+        if (CanExtend) {
+          void *MappedPtr = ::mremap(old_address, old_size, new_size, flags & ~MREMAP_MAYMOVE);
+
+          if (MappedPtr != MAP_FAILED) {
+            // Map the new pages
+            size_t NewPagesLength = AlignUp(new_size, PAGE_SIZE) >> PAGE_SHIFT;
+            uintptr_t NewAddr = reinterpret_cast<uintptr_t>(MappedPtr);
+            SetUsedPages(NewAddr >> PAGE_SHIFT, NewPagesLength);
+            return MappedPtr;
+          }
+          else if (!(flags & MREMAP_MAYMOVE)) {
+            // We have one more chance if MAYMOVE is specified
+            LogMan::Msg::E("@@@@@ %d mremap failed! '%s'", __LINE__, strerror(-errno));
+            return (void*)(uintptr_t)-errno;
+          }
+        }
+      }
+    }
+  }
+
+  // Flags can not contain MREMAP_FIXED at this point
+  // Flags might contain MREMAP_MAYMOVE and/or MREMAP_DONTUNMAP
+  // New Size is >= old size
+
+  // First, try and allocate a region the size of the new size
+  void *MappedPtr = this->mmap(nullptr, new_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   std::scoped_lock<std::mutex> lk{AllocMutex};
-  // XXX: Not currently supported
-  return reinterpret_cast<void*>(-ENOMEM);
+  if (reinterpret_cast<uintptr_t>(MappedPtr) > -4096) {
+    // Couldn't find a region that fit our space
+    LogMan::Msg::E("@@@@@ %d mremap failed! '%s'", __LINE__, strerror(-(uint64_t)MappedPtr));
+    return MappedPtr;
+  }
+
+  // Good news, we found a region
+  // This will overwrite the previous mmap if it succeeds
+  MappedPtr = ::mremap(old_address, old_size, new_size, flags | MREMAP_FIXED | MREMAP_MAYMOVE, MappedPtr);
+
+  if (MappedPtr != MAP_FAILED) {
+    if (!(flags & MREMAP_DONTUNMAP) &&
+        MappedPtr != old_address) {
+      // If we have both MREMAP_DONTUNMAP not set and the new pointer is at a new location
+      // Make sure to clear the old mapping
+      uintptr_t OldAddr = reinterpret_cast<uintptr_t>(old_address);
+      SetFreePages(OldAddr >> PAGE_SHIFT , OldPagesLength);
+    }
+
+    // Map the new pages
+    size_t NewPagesLength = AlignUp(new_size, PAGE_SIZE) >> PAGE_SHIFT;
+    uintptr_t NewAddr = reinterpret_cast<uintptr_t>(MappedPtr);
+    SetUsedPages(NewAddr >> PAGE_SHIFT, NewPagesLength);
+    return MappedPtr;
+  }
+  LogMan::Msg::E("@@@@@ %d mremap failed! '%s'", __LINE__, strerror(-errno));
+
+  // Failed
+  return (void*)(uintptr_t)-errno;
 }
 
+uint64_t MemAllocator::Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) {
+  std::scoped_lock<std::mutex> lk{AllocMutex};
+
+  if (shmaddr != nullptr) {
+    // shmaddr must be valid
+    uint64_t Result = reinterpret_cast<uint64_t>(shmat(shmid, shmaddr, shmflg));
+    if (Result != -1) {
+      uint32_t SmallRet = Result >> 32;
+      if (!(SmallRet == 0 ||
+            SmallRet == ~0U)) {
+        LogMan::Msg::A("Syscall returning something with data in the upper 32bits! BUG!");
+        return -ENOMEM;
+      }
+
+      uintptr_t NewAddr = reinterpret_cast<uintptr_t>(Result);
+      uintptr_t NewPageAddr = NewAddr >> PAGE_SHIFT;
+
+      // Add to the map
+      PageToShm[NewPageAddr] = shmid;
+
+      *ResultAddress = Result;
+
+      // We must get the shm size and track it
+      struct shmid_ds buf{};
+
+      if (shmctl(shmid, IPC_STAT, &buf) == 0) {
+        // Map the new pages
+        size_t NewPagesLength = buf.shm_segsz >> PAGE_SHIFT;
+        SetUsedPages(NewPageAddr, NewPagesLength);
+      }
+
+      // Zero on working result
+      Result = 0;
+    }
+    else {
+      Result = -errno;
+    }
+    return Result;
+  }
+  else {
+    // We must get the shm size and track it
+    struct shmid_ds buf{};
+    uint64_t PagesLength{};
+
+    if (shmctl(shmid, IPC_STAT, &buf) == 0) {
+      PagesLength = AlignUp(buf.shm_segsz, PAGE_SIZE) >> PAGE_SHIFT;
+    }
+    else {
+      return -EINVAL;
+    }
+
+    bool Wrapped = false;
+    uint64_t BottomPage = LastScanLocation;
+restart:
+    {
+      // Linear range scan
+      uint64_t LowerPage = (this->*FindPageRangePtr)(BottomPage, PagesLength);
+      if (LowerPage == 0) {
+        // Try again but this time from the start
+        BottomPage = LastKeyLocation;
+        LowerPage = (this->*FindPageRangePtr)(BottomPage, PagesLength);
+      }
+
+      uint64_t UpperPage = LowerPage + PagesLength;
+      if (LowerPage == 0) {
+        LogMan::Msg::E("@@@@@ shmat no mem!");
+        return -ENOMEM;
+      }
+      {
+        // Try and map the range
+        void *MappedPtr = ::shmat(
+          shmid,
+          reinterpret_cast<const void*>(LowerPage << PAGE_SHIFT),
+          shmflg);
+
+        if (MappedPtr == MAP_FAILED) {
+          if (UpperPage == TOP_KEY) {
+            BottomPage = LastKeyLocation;
+            Wrapped = true;
+            goto restart;
+          }
+          else if (Wrapped &&
+            LowerPage >= LastScanLocation) {
+            // We linear scanned the entire memory range. Give up
+            return -errno;
+          }
+          else {
+            // Try again
+            BottomPage += PagesLength;
+            goto restart;
+          }
+        }
+        else {
+          if (SearchDown) {
+            LastScanLocation = LowerPage;
+          }
+          else {
+            LastScanLocation = UpperPage;
+          }
+          // Set the range as mapped
+          SetUsedPages(LowerPage, PagesLength);
+
+          *ResultAddress = reinterpret_cast<uint64_t>(MappedPtr);
+
+          // Add to the map
+          PageToShm[LowerPage] = shmid;
+
+          // Zero on working result
+          return 0;
+        }
+      }
+    }
+  }
+}
+uint64_t MemAllocator::Shmdt(const void* shmaddr) {
+  uint32_t AddrPage = reinterpret_cast<uint64_t>(shmaddr) >> PAGE_SHIFT;
+  auto it = PageToShm.find(AddrPage);
+
+  if (it == PageToShm.end()) {
+    // Page wasn't mapped
+    return -EINVAL;
+  }
+
+  uint64_t Result = ::shmdt(shmaddr);
+  PageToShm.erase(it);
+  return Result;
+}
+
+#define _H (uint32_t)(uint64_t)
+
   static std::unique_ptr<MemAllocator> alloc{};
+
+uint64_t Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) {
+  return alloc->Shmat(shmid, shmaddr, shmflg, ResultAddress);
+}
+
+uint64_t Shmdt(const void* shmaddr) {
+  return alloc->Shmdt(shmaddr);
+}
+
   void RegisterMemory(bool Has64BitAllocator) {
     if (Has64BitAllocator) {
       REGISTER_SYSCALL_IMPL_X32(mmap, [](FEXCore::Core::InternalThreadState *Thread, uint32_t addr, uint32_t length, int prot, int flags, int fd, int32_t offset) -> uint64_t {

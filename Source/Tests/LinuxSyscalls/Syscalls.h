@@ -52,7 +52,7 @@ public:
   // In the case that the syscall doesn't hit the optimized path then we still need to go here
   uint64_t HandleSyscall(FEXCore::Core::InternalThreadState *Thread, FEXCore::HLE::SyscallArguments *Args) final override;
 
-  void DefaultProgramBreak(FEXCore::Core::InternalThreadState *Thread);
+  void DefaultProgramBreak(uint64_t Base, uint64_t Size);
 
   using SyscallPtrArg0 = uint64_t(*)(FEXCore::Core::InternalThreadState *Thread);
   using SyscallPtrArg1 = uint64_t(*)(FEXCore::Core::InternalThreadState *Thread, uint64_t);
@@ -109,6 +109,7 @@ protected:
   // BRK management
   uint64_t DataSpace {};
   uint64_t DataSpaceSize {};
+  uint64_t DataSpaceMaxSize {};
 
 private:
 

@@ -83,7 +83,8 @@ namespace FEXCore::Context {
     bool Running{};
 
     FEXCore::CPUIDEmu CPUID;
-    FEXCore::HLE::SyscallHandler *SyscallHandler{};
+    FEXCore::HLE::SyscallHandler *SyscallHandler32{};
+    FEXCore::HLE::SyscallHandler *SyscallHandler64{};
     std::unique_ptr<FEXCore::ThunkHandler> ThunkHandler;
 
     CustomCPUFactoryType CustomCPUFactory;

@@ -440,8 +440,12 @@ void *InterpreterCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true
 
 void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
   volatile void* stack = alloca(0);
+
+
   auto IR = Thread->IRLists.find(Thread->State.State.rip);
   auto CurrentIR = IR->second.get();
+
+  auto HeaderOp = CurrentIR->GetHeader();
 
   uintptr_t ListSize = CurrentIR->GetSSACount();
 
@@ -585,7 +589,13 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
               Args.Argument[j] = *GetSrc<uint64_t*>(SSAData, Op->Header.Args[j]);
             }
 
-            uint64_t Res = FEXCore::Context::HandleSyscall(CTX->SyscallHandler, Thread, &Args);
+            uint64_t Res{};
+            if (Op->Is64Bit) {
+              Res = FEXCore::Context::HandleSyscall(CTX->SyscallHandler64, Thread, &Args);
+            }
+            else {
+              Res = FEXCore::Context::HandleSyscall(CTX->SyscallHandler32, Thread, &Args);
+            }
             GD = Res;
             break;
           }
@@ -840,6 +850,10 @@ void InterpreterCore::ExecuteCode(FEXCore::Core::InternalThreadState *Thread) {
             // Size is the size of each pair element
             switch (Size) {
               case 4: {
+                uint64_t Ptr = *GetSrc<uint64_t*>(SSAData, Op->Header.Args[2]);
+                if (Ptr & 0b111) {
+                  ERROR_AND_DIE("CASPair8B not aligned to 8 bytes! 0x%lx. Entry: 0x%lx", Ptr, HeaderOp->Entry);
+                }
                 std::atomic<uint64_t> *Data = *GetSrc<std::atomic<uint64_t> **>(SSAData, Op->Header.Args[2]);
 
                 uint64_t Src1 = *GetSrc<uint64_t*>(SSAData, Op->Header.Args[0]);

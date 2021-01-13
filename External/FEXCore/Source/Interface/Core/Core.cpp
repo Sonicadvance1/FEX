@@ -24,6 +24,7 @@
 
 #include <fstream>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #include "Interface/Core/GdbServer.h"
 
@@ -262,9 +263,9 @@ namespace FEXCore::Context {
 
     Loader->LoadMemory();
     Loader->GetInitLocations(&InitLocations);
+    Loader->InitializeThreadState(Thread);
 
     Thread->State.State.rip = StartingRIP = Loader->DefaultRIP();
-
     InitializeThreadData(Thread);
 
     return true;
@@ -470,6 +471,11 @@ namespace FEXCore::Context {
       CompileRIP(Thread, Entry);
     }
     LogMan::Msg::D("Done", EntryList.size());
+
+    uint64_t StackSize = 2 * 1024 * 1024;
+#define MAP_32BIT 0
+    Thread->State.StackPivot = (uint64_t)mmap(nullptr, StackSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
+    Thread->State.StackPivot += StackSize;
   }
 
   void Context::InitializeThread(FEXCore::Core::InternalThreadState *Thread) {
@@ -500,7 +506,8 @@ namespace FEXCore::Context {
     State->PassManager->AddDefaultPasses(Config.Core == FEXCore::Config::CONFIG_IRJIT);
     State->PassManager->AddDefaultValidationPasses();
 
-    State->PassManager->RegisterSyscallHandler(SyscallHandler);
+    State->PassManager->RegisterSyscallHandler32(SyscallHandler32);
+    State->PassManager->RegisterSyscallHandler64(SyscallHandler64);
 
     State->CTX = this;
 
@@ -614,6 +621,7 @@ namespace FEXCore::Context {
       auto CodeBlocks = Thread->FrontendDecoder->GetDecodedBlocks();
 
       Thread->OpDispatcher->BeginFunction(GuestRIP, CodeBlocks);
+      // Thread->OpDispatcher->_Print(Thread->OpDispatcher->_Constant(GuestRIP));
 
       for (size_t j = 0; j < CodeBlocks->size(); ++j) {
         FEXCore::Frontend::Decoder::DecodedBlocks const &Block = CodeBlocks->at(j);
@@ -749,7 +757,8 @@ namespace FEXCore::Context {
         IRDumper(Thread->PassManager->GetRAPass());
       }
 
-      if (Thread->OpDispatcher->ShouldDump) {
+      if (Thread->OpDispatcher->ShouldDump)
+      {
         std::stringstream out;
         auto NewIR = Thread->OpDispatcher->ViewIR();
         FEXCore::IR::Dump(&out, &NewIR, Thread->PassManager->GetRAPass());

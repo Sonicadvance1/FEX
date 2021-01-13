@@ -1,3 +1,4 @@
+#include <FEXCore/Utils/Common/MathUtils.h>
 #include <FEXCore/Utils/ELFLoader.h>
 #include <FEXCore/Utils/LogManager.h>
 #include <cstring>
@@ -5,6 +6,7 @@
 #include <fstream>
 #include <stdint.h>
 #include <vector>
+
 
 namespace ELFLoader {
 bool ELFContainer::IsSupportedELF(std::string const &Filename) {
@@ -302,8 +304,10 @@ void ELFContainer::CalculateMemoryLayouts() {
   if (Mode == MODE_32BIT) {
     for (uint32_t i = 0; i < ProgramHeaders.size(); ++i) {
       Elf32_Phdr *hdr = ProgramHeaders.at(i)._32;
-      MinPhysAddr = std::min(MinPhysAddr, static_cast<uint64_t>(hdr->p_paddr));
-      MaxPhysAddr = std::max(MaxPhysAddr, static_cast<uint64_t>(hdr->p_paddr) + hdr->p_memsz);
+      if (hdr->p_memsz > 0) {
+        MinPhysAddr = std::min(MinPhysAddr, static_cast<uint64_t>(hdr->p_paddr));
+        MaxPhysAddr = std::max(MaxPhysAddr, static_cast<uint64_t>(hdr->p_paddr) + hdr->p_memsz);
+      }
       if (hdr->p_type == PT_TLS) {
         TLSHeader._32 = hdr;
       }
@@ -326,6 +330,11 @@ void ELFContainer::CalculateMemoryLayouts() {
       }
     }
   }
+
+  // Calculate BRK
+  MaxPhysAddr = AlignUp(MaxPhysAddr, 4096);
+  BRKBase = MaxPhysAddr;
+  MaxPhysAddr += BRKSize;
 
   PhysMemSize = MaxPhysAddr - MinPhysAddr;
 

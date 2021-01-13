@@ -56,13 +56,18 @@ public:
     return reinterpret_cast<IR::RegisterAllocationPass*>(RAPass);
   }
 
-  void RegisterSyscallHandler(FEXCore::HLE::SyscallHandler *Handler) {
-    SyscallHandler = Handler;
+  void RegisterSyscallHandler32(FEXCore::HLE::SyscallHandler *Handler) {
+    SyscallHandler32 = Handler;
+  }
+
+  void RegisterSyscallHandler64(FEXCore::HLE::SyscallHandler *Handler) {
+    SyscallHandler64 = Handler;
   }
 
 protected:
   ShouldExitHandler ExitHandler;
-  FEXCore::HLE::SyscallHandler *SyscallHandler;
+  FEXCore::HLE::SyscallHandler *SyscallHandler32{};
+  FEXCore::HLE::SyscallHandler *SyscallHandler64{};
 
 private:
   Pass *RAPass{};

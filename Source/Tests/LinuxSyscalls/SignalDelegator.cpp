@@ -83,6 +83,7 @@ namespace FEX::HLE {
 
     if (!Thread) {
       LogMan::Msg::E("[%d] Thread has received a signal and hasn't registered itself with the delegate! Programming error!", gettid());
+      //while(1);
     }
     else {
       if (Handler.Handler &&
@@ -117,6 +118,7 @@ namespace FEX::HLE {
           // POSIX leaves it unspecific
           // "do not transform children in to zombies when they terminate"
           // XXX: Handle this
+          LogMan::Msg::D("[%d] Do not transform children to zombies", ::gettid());
         }
       }
 
@@ -250,7 +252,19 @@ namespace FEX::HLE {
     // This only gets called if a guest thunk was already installed and we need to check if we need to update the flags or signal mask
     if ((SignalHandler.GuestAction.sa_flags ^ SignalHandler.HostAction.sa_flags) & SA_NODEFER) {
       // NODEFER changed, we need to update this
-      SignalHandler.HostAction.sa_flags |= SignalHandler.GuestAction.sa_flags & SA_NODEFER;
+      SignalHandler.HostAction.sa_flags = (SignalHandler.HostAction.sa_flags & ~SA_NODEFER) | (SignalHandler.GuestAction.sa_flags & SA_NODEFER);
+      Changed = true;
+    }
+
+    if ((SignalHandler.GuestAction.sa_flags ^ SignalHandler.HostAction.sa_flags) & SA_NOCLDWAIT) {
+      // NOCLDWAIT changed, we need to update this
+      SignalHandler.HostAction.sa_flags = (SignalHandler.HostAction.sa_flags & ~SA_NOCLDWAIT) | (SignalHandler.GuestAction.sa_flags & SA_NOCLDWAIT);
+      Changed = true;
+    }
+
+    if ((SignalHandler.GuestAction.sa_flags ^ SignalHandler.HostAction.sa_flags) & SA_NOCLDSTOP) {
+      // NOCLDSTOP changed, we need to update this
+      SignalHandler.HostAction.sa_flags = (SignalHandler.HostAction.sa_flags & ~SA_NOCLDSTOP) | (SignalHandler.GuestAction.sa_flags & SA_NOCLDSTOP);
       Changed = true;
     }
 

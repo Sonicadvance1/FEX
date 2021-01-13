@@ -32,10 +32,10 @@ DEF_OP(CASPair) {
   // RDX:RAX contains our expected value
   // RCX:RBX contains our desired
 
-  lock();
 
   switch (OpSize) {
     case 4: {
+      lock();
       cmpxchg8b(dword [MemReg]);
       // EDX:EAX now contains the result
       mov(Dst.first.cvt32(), eax);
@@ -43,6 +43,7 @@ DEF_OP(CASPair) {
     break;
     }
     case 8: {
+      lock();
       cmpxchg16b(qword [MemReg]);
       // RDX:RAX now contains the result
       mov(Dst.first, rax);

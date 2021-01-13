@@ -84,6 +84,7 @@ DispatchGenerator::DispatchGenerator(FEXCore::Context::Context *ctx, FEXCore::Co
   // Save this stack pointer so we can cleanly shutdown the emulation with a long jump
   // regardless of where we were in the stack
   mov(qword [rdi + offsetof(FEXCore::Core::ThreadState, ReturningStackLocation)], rsp);
+  mov(rsp, qword [STATE + offsetof(FEXCore::Core::ThreadState, StackPivot)]);
 
   Label LoopTop;
   Label NoBlock;

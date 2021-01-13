@@ -140,7 +140,8 @@ namespace FEXCore::Context {
   }
 
   void SetSyscallHandler(FEXCore::Context::Context *CTX, FEXCore::HLE::SyscallHandler *Handler) {
-    CTX->SyscallHandler = Handler;
+    CTX->SyscallHandler32 = Handler;
+    CTX->SyscallHandler64 = Handler;
   }
 
   FEXCore::CPUID::FunctionResults RunCPUIDFunction(FEXCore::Context::Context *CTX, uint32_t Function, [[maybe_unused]] uint32_t Leaf) {

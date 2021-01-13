@@ -653,11 +653,11 @@ DEF_OP(StoreMemTSO) {
 }
 
 DEF_OP(VLoadMemElement) {
-  LogMan::Msg::A("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(VStoreMemElement) {
-  LogMan::Msg::A("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 #undef DEF_OP

@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <set>
 #include <string>
+#include <sys/mman.h>
 #include <sys/stat.h>
 
 namespace ELFLoader {
@@ -92,23 +93,41 @@ ELFSymbolDatabase::ELFSymbolDatabase(::ELFLoader::ELFContainer *file)
     }
   } while (!UnfilledDependencies.empty() && !NewLibraries.empty());
 
-  FillMemoryLayouts();
+  FillMemoryLayouts(0);
   FillInitializationOrder();
   FillSymbols();
+
+  if (LocalInfo.Container->WasDynamic() && File->GetMode() == ELFContainer::MODE_64BIT) {
+    ELFBase = mmap(nullptr, ELFMemorySize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    FillMemoryLayouts(reinterpret_cast<uintptr_t>(ELFBase));
+    FillInitializationOrder();
+    FillSymbols();
+
+    FixedNoReplace = false;
+  }
 }
 
 ELFSymbolDatabase::~ELFSymbolDatabase() {
+  if (ELFBase) {
+    munmap(ELFBase, ELFMemorySize);
+    ELFBase = nullptr;
+  }
 }
 
-void ELFSymbolDatabase::FillMemoryLayouts() {
-  uint64_t ELFBases = {};
-  if (File->GetMode() == ELFContainer::MODE_64BIT) {
-    ELFBases = 0x1'0000'0000;
+void ELFSymbolDatabase::FillMemoryLayouts(uint64_t DefinedBase) {
+  uint64_t ELFBases = DefinedBase;
+  if (!DefinedBase) {
+    if (File->GetMode() == ELFContainer::MODE_64BIT) {
+      ELFBases = 0x2'0000'0000;
+    }
+    else {
+      // 32bit we will just load at the lowest memory address we can
+      // Which on Linux is at 0x1'0000
+      ELFBases = 0x1'0000;
+    }
   }
   else {
-    // 32bit we will just load at the lowest memory address we can
-    // Which on Linux is at 0x1'0000
-    ELFBases = 0x1'0000;
+    LogMan::Msg::D("was dynamic");
   }
   // We can only relocate the passed in ELF if it is dynamic
   // If it is EXEC then it HAS to end up in the base offset it chose
@@ -127,6 +146,7 @@ void ELFSymbolDatabase::FillMemoryLayouts() {
     LocalInfo.GuestBase = ELFBases;
 
     ELFBases += CurrentELFAlignedSize;
+    ELFMemorySize += CurrentELFAlignedSize;
   }
   else {
     LocalInfo.CustomLayout = File->GetLayout();
@@ -139,6 +159,7 @@ void ELFSymbolDatabase::FillMemoryLayouts() {
 
     std::get<2>(LocalInfo.CustomLayout) = CurrentELFAlignedSize;
     LocalInfo.GuestBase = 0;
+    ELFMemorySize += CurrentELFAlignedSize;
   }
 
   for (size_t i = 0; i < DynamicELFInfo.size(); ++i) {
@@ -159,6 +180,7 @@ void ELFSymbolDatabase::FillMemoryLayouts() {
     DynamicELFInfo[i]->GuestBase = ELFBases;
 
     ELFBases += CurrentELFAlignedSize;
+    ELFMemorySize += CurrentELFAlignedSize;
   }
 }
 
@@ -226,18 +248,20 @@ void ELFSymbolDatabase::FillSymbols() {
 
     ELF->Container->AddSymbols(SymbolFiller);
   }
-
 }
 
-void ELFSymbolDatabase::MapMemoryRegions(std::function<void*(uint64_t, uint64_t)> Mapper) {
+void ELFSymbolDatabase::MapMemoryRegions(std::function<void*(uint64_t, uint64_t, bool)> Mapper) {
   auto Map = [&](ELFInfo& ELF) {
     uint64_t ELFBase = std::get<0>(ELF.CustomLayout);
     uint64_t ELFSize = std::get<2>(ELF.CustomLayout);
     uint64_t OffsetFromBase = ELFBase - ELF.GuestBase;
-    ELF.ELFBase = static_cast<uint8_t*>(Mapper(ELFBase, ELFSize)) - OffsetFromBase;
+    LogMan::Msg::D("Mapping [0x%lx, 0x%lx)", ELFBase, ELFBase+ELFSize);
+
+    ELF.ELFBase = static_cast<uint8_t*>(Mapper(ELFBase, ELFSize, FixedNoReplace)) - OffsetFromBase;
   };
 
   Map(LocalInfo);
+
   for (auto *ELF : DynamicELFInfo) {
     Map(*ELF);
   }

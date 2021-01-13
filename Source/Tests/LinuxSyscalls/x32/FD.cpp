@@ -25,6 +25,38 @@ ARG_TO_STR(FEX::HLE::x32::compat_ptr<FEX::HLE::x32::sigset_argpack32>, "%lx")
 
 namespace FEX::HLE::x32 {
   using fd_set32 = uint32_t;
+#ifdef _M_X86_64
+  uint32_t ioctl32(int fd, uint32_t request, uint32_t args) {
+    uint32_t Result{};
+    // x86-64 with compatibility compiled in can still reach the 32bit syscall handler through int 0x80
+    // It can also access through the x32 syscall API which will eventually be deprecated and removed
+    // x32 ioctl number is ((1U << 30) | 514)
+#define NR_ioctl_x86 54
+    __asm volatile("int $0x80;"
+        : "=a" (Result)
+        : "a" (NR_ioctl_x86)
+        , "b" (fd)
+        , "c" (request)
+        , "d" (args)
+        : "memory");
+    // Return result like glibc
+    // -1 through -4095 are errors
+    if (Result > -4096) {
+      errno = -Result;
+      return -1;
+    }
+    return Result;
+  }
+#else
+  uint32_t ioctl32(int fd, uint32_t request, uint32_t args) {
+#define SYS_ioctl32 442
+    uint32_t Result = ::syscall(SYS_ioctl32,
+      static_cast<uint64_t>(fd),
+      request,
+      args);
+    return Result;
+  }
+#endif
 
   void RegisterFD() {
     REGISTER_SYSCALL_IMPL_X32(poll, [](FEXCore::Core::InternalThreadState *Thread, struct pollfd *fds, nfds_t nfds, int timeout) -> uint64_t {
@@ -359,10 +391,7 @@ namespace FEX::HLE::x32 {
     });
 
     REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::InternalThreadState *Thread, int fd, uint32_t request, uint32_t args) -> uint64_t {
-      uint64_t Result = ::syscall(SYS_ioctl,
-        static_cast<uint64_t>(fd),
-        request,
-        args);
+      uint64_t Result = ioctl32(fd, request, args);
       SYSCALL_ERRNO();
     });
 

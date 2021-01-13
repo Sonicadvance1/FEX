@@ -5,17 +5,17 @@
 namespace FEXCore::IR {
 
 void PassManager::AddDefaultPasses(bool InlineConstants) {
-  InsertPass(CreateContextLoadStoreElimination());
-  InsertPass(CreateDeadFlagStoreElimination());
-  InsertPass(CreateDeadGPRStoreElimination());
-  InsertPass(CreateDeadFPRStoreElimination());
-  InsertPass(CreatePassDeadCodeElimination());
-  InsertPass(CreateConstProp(InlineConstants));
+  //InsertPass(CreateContextLoadStoreElimination());
+  //InsertPass(CreateDeadFlagStoreElimination());
+  //InsertPass(CreateDeadGPRStoreElimination());
+  //InsertPass(CreateDeadFPRStoreElimination());
+  //InsertPass(CreatePassDeadCodeElimination());
+  //InsertPass(CreateConstProp(InlineConstants));
 
   ////// InsertPass(CreateDeadFlagCalculationEliminination());
 
-  InsertPass(CreateSyscallOptimization());
-  InsertPass(CreatePassDeadCodeElimination());
+  //InsertPass(CreateSyscallOptimization());
+  //InsertPass(CreatePassDeadCodeElimination());
 
   // If the IR is compacted post-RA then the node indexing gets messed up and the backend isn't able to find the register assigned to a node
   // Compact before IR, don't worry about RA generating spills/fills

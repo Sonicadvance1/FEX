@@ -92,6 +92,7 @@ struct HostFPRState {
 };
 
 struct ContextBackup {
+  uint64_t StoredCookie;
   // Host State
   uint64_t GPRs[31];
   uint64_t PrevSP;
@@ -116,10 +117,14 @@ void JITCore::StoreThreadState(int Signal, void *ucontext) {
   uintptr_t NewSP = OldSP;
 
   size_t StackOffset = sizeof(ContextBackup);
+  NewSP -= 128; // Shouldn't be necessary
   NewSP -= StackOffset;
   NewSP = AlignDown(NewSP, 16);
 
   ContextBackup *Context = reinterpret_cast<ContextBackup*>(NewSP);
+
+  Context->StoredCookie = 0x4142434445464748ULL;
+
   memcpy(&Context->GPRs[0], &_mcontext->regs[0], 31 * sizeof(uint64_t));
   Context->PrevSP = _mcontext->sp;
   Context->PrevPC = _mcontext->pc;
@@ -142,15 +147,23 @@ void JITCore::StoreThreadState(int Signal, void *ucontext) {
 
   // Set the new SP
   _mcontext->sp = NewSP;
+  SignalFrames.push(NewSP);
 }
 
 void JITCore::RestoreThreadState(void *ucontext) {
   ucontext_t* _context = (ucontext_t*)ucontext;
   mcontext_t* _mcontext = &_context->uc_mcontext;
 
-  uint64_t OldSP = _mcontext->sp;
+  uint64_t OldSP = SignalFrames.top();
+  SignalFrames.pop();
   uintptr_t NewSP = OldSP;
   ContextBackup *Context = reinterpret_cast<ContextBackup*>(NewSP);
+
+  if (Context->StoredCookie != 0x4142434445464748ULL) {
+    LogMan::Msg::D("COOKIE WAS NOT CORRECT!\n");
+    while (1);
+    exit(-1);
+  }
 
   // First thing, reset the guest state
   memcpy(&State->State, &Context->GuestState, sizeof(FEXCore::Core::CPUState));
@@ -171,31 +184,6 @@ void JITCore::RestoreThreadState(void *ucontext) {
   // Restore the previous signal state
   // This allows recursive signals to properly handle signal masking as we are walking back up the list of signals
   CTX->SignalDelegation->SetCurrentSignal(Context->Signal);
-}
-
-bool JITCore::HandleSIGILL(int Signal, void *info, void *ucontext) {
-  ucontext_t* _context = (ucontext_t*)ucontext;
-  mcontext_t* _mcontext = &_context->uc_mcontext;
-
-  if (_mcontext->pc == ThreadSharedData.SignalReturnInstruction) {
-    RestoreThreadState(ucontext);
-
-    // Ref count our faults
-    // We use this to track if it is safe to clear cache
-    --SignalHandlerRefCounter;
-    return true;
-  }
-
-  if (_mcontext->pc == PauseReturnInstruction) {
-    RestoreThreadState(ucontext);
-
-    // Ref count our faults
-    // We use this to track if it is safe to clear cache
-    --SignalHandlerRefCounter;
-    return true;
-  }
-
-  return false;
 }
 
 bool JITCore::HandleGuestSignal(int Signal, void *info, void *ucontext, GuestSigAction *GuestAction, stack_t *GuestStack) {
@@ -330,6 +318,33 @@ bool JITCore::HandleGuestSignal(int Signal, void *info, void *ucontext, GuestSig
   return true;
 }
 
+bool JITCore::HandleSIGILL(int Signal, void *info, void *ucontext) {
+  ucontext_t* _context = (ucontext_t*)ucontext;
+  mcontext_t* _mcontext = &_context->uc_mcontext;
+
+  if (_mcontext->pc == ThreadSharedData.SignalReturnInstruction) {
+    RestoreThreadState(ucontext);
+
+    // Ref count our faults
+    // We use this to track if it is safe to clear cache
+    --SignalHandlerRefCounter;
+    return true;
+  }
+
+  if (_mcontext->pc == PauseReturnInstruction) {
+    RestoreThreadState(ucontext);
+
+    // Ref count our faults
+    // We use this to track if it is safe to clear cache
+    --SignalHandlerRefCounter;
+    return true;
+  }
+
+  return false;
+}
+
+
+
 JITCore::CodeBuffer JITCore::AllocateNewCodeBuffer(size_t Size) {
   CodeBuffer Buffer;
   Buffer.Size = Size;
@@ -347,7 +362,136 @@ void JITCore::FreeCodeBuffer(CodeBuffer Buffer) {
   munmap(Buffer.Ptr, Buffer.Size);
 }
 
-bool JITCore::HandleSIGBUS(int Signal, void *info, void *ucontext) {
+static uint32_t LoadAcquire(uint64_t Addr) {
+  std::atomic<uint32_t> *Atom = reinterpret_cast<std::atomic<uint32_t>*>(Addr);
+  return Atom->load(std::memory_order_acquire);
+}
+
+static bool StoreCAS(uint32_t &Expected, uint32_t Val, uint64_t Addr) {
+  std::atomic<uint32_t> *Atom = reinterpret_cast<std::atomic<uint32_t>*>(Addr);
+  return Atom->compare_exchange_strong(Expected, Val);
+}
+
+static bool HandleCASPAL(uint64_t RIP, mcontext_t* _mcontext, uint32_t Instr) {
+  uint32_t Size = (Instr >> 30) & 1;
+
+  uint32_t DesiredReg1 = Instr & 0b11111;
+  uint32_t DesiredReg2 = DesiredReg1 + 1;
+  uint32_t ExpectedReg1 = (Instr >> 16) & 0b11111;
+  uint32_t ExpectedReg2 = ExpectedReg1 + 1;
+  uint32_t AddressReg = (Instr >> 5) & 0b11111;
+
+  if (Size == 0) {
+    // 32bit
+    uint64_t Addr = _mcontext->regs[AddressReg];
+    uint64_t AddrUpper = _mcontext->regs[AddressReg] + 4;
+
+    uint32_t DesiredLower = _mcontext->regs[DesiredReg1];
+    uint32_t DesiredUpper = _mcontext->regs[DesiredReg2];
+
+    uint32_t ExpectedLower = _mcontext->regs[ExpectedReg1];
+    uint32_t ExpectedUpper = _mcontext->regs[ExpectedReg2];
+
+    // Cross-cacheline CAS doesn't work on ARM
+    // It isn't even guaranteed to work on x86
+    // Intel does a full lock on this case and I believe AMD will tear
+    if ((Addr & 63) > 60) {
+      // Crosses cache line
+      LogMan::Msg::E("Unhandled JIT SIGBUS from CASPAL: Alignment crossed Cacheline! 0x%lx 0x%lx\n", Addr, Addr & 63);
+      return false;
+    }
+
+    // ARMv8.4 LSE2 solves both of these problems
+    if ((Addr & 0b1111) > 8) {
+      // Crosses 16byte boundary
+      uint32_t ActualUpper{};
+      uint32_t ActualLower{};
+      while (1) {
+        // Careful ordering here
+        ActualUpper = LoadAcquire(AddrUpper);
+        ActualLower = LoadAcquire(Addr);
+        if (ActualUpper == ExpectedUpper &&
+            ActualLower == ExpectedLower) {
+          if (StoreCAS(ExpectedUpper, DesiredUpper, AddrUpper)) {
+            if (StoreCAS(ExpectedLower, DesiredLower, Addr)) {
+              // Stored successfully
+              return true;
+            }
+            else {
+              // CAS managed to tear, we can't really solve this
+              // Continue down the path to let the guest know values weren't expected
+              ActualLower = ExpectedLower;
+              ActualUpper = ExpectedUpper;
+              break;
+            }
+          }
+          else {
+            // Try again
+            // Initial value failed so it is safe to try again
+          }
+        }
+        else {
+          break;
+        }
+      }
+
+      // Expected wasn't what we wanted
+      // Return the actual memory values in the expected registers
+      _mcontext->regs[ExpectedReg1] = ActualLower;
+      _mcontext->regs[ExpectedReg2] = ActualUpper;
+      return true;
+    }
+    else {
+      // Fits within a 16byte region
+      uint64_t Alignment = Addr & 0b1111;
+      Addr &= ~0b1111ULL;
+      std::atomic<__uint128_t> *Atomic128 = reinterpret_cast<std::atomic<__uint128_t>*>(Addr);
+
+      __uint128_t Mask = ~0ULL;
+      Mask <<= Alignment * 8;
+      __uint128_t NegMask = ~Mask;
+      __uint128_t TmpExpected{};
+      __uint128_t TmpDesired{};
+
+      __uint128_t Desired = (uint64_t)DesiredUpper << 32 | DesiredLower;
+      Desired <<= Alignment * 8;
+      while (1) {
+        TmpExpected = Atomic128->load();
+        TmpDesired = TmpExpected;
+        TmpDesired &= NegMask;
+        TmpDesired |= Desired;
+        bool CASResult = Atomic128->compare_exchange_strong(TmpExpected, TmpDesired);
+        if (CASResult) {
+          // Successful, so we are done
+          return true;
+        }
+        else {
+          // Not successful
+          // Now we need to check the results to see if we need to try again
+          __uint128_t FailedResultOurBits = TmpExpected & Mask;
+          __uint128_t FailedResultNotOurBits = TmpExpected & NegMask;
+
+          __uint128_t FailedDesiredOurBits = TmpDesired & Mask;
+          __uint128_t FailedDesiredNotOurBits = TmpDesired & NegMask;
+          if ((FailedResultNotOurBits ^ FailedDesiredNotOurBits) != 0) {
+            // If the bits changed that weren't part of our regular CAS then we need to try again
+            continue;
+          }
+          if ((FailedResultOurBits ^ FailedDesiredOurBits) != 0) {
+            // If the bits changed that we were wanting to change then we have failed and can return
+            // We need to extract the bits and return them in EXPECTED
+            uint64_t FailedDesired = FailedDesiredOurBits >> (Alignment * 8);
+            _mcontext->regs[ExpectedReg1] = FailedDesired & ~0U;
+            _mcontext->regs[ExpectedReg2] = FailedDesired >> 32;
+            return true;
+          }
+        }
+      }
+    }
+  }
+}
+
+bool JITCore::HandleSIGBUS(uint64_t RIP, int Signal, void *info, void *ucontext) {
   ucontext_t* _context = (ucontext_t*)ucontext;
   mcontext_t* _mcontext = &_context->uc_mcontext;
   uint32_t *PC = (uint32_t*)_mcontext->pc;
@@ -375,6 +519,8 @@ bool JITCore::HandleSIGBUS(int Signal, void *info, void *ucontext) {
     PC[-1] = DMB;
     PC[0] = LDR;
     PC[1] = DMB;
+    // Back up one instruction and have another go
+    _mcontext->pc -= 4;
   }
   else if ( (Instr & 0x3F'FF'FC'00) == 0x08'9F'FC'00) { // STLR*
     uint32_t STR = 0b0011'1000'0011'1111'0110'1000'0000'0000;
@@ -384,15 +530,24 @@ bool JITCore::HandleSIGBUS(int Signal, void *info, void *ucontext) {
     PC[-1] = DMB;
     PC[0] = STR;
     PC[1] = DMB;
-
+    // Back up one instruction and have another go
+    _mcontext->pc -= 4;
+  }
+  else if ((Instr & 0xBF'E0'FC'00) == 0x08'60'FC'00) { // CASPAL
+    if (HandleCASPAL(RIP, _mcontext, Instr)) {
+      // Skip this instruction now
+      _mcontext->pc += 4;
+    }
+    else {
+      LogMan::Msg::E("Unhandled JIT SIGBUS CASPAL: PC: %p Instruction: 0x%08x\n", PC, PC[0]);
+      return false;
+    }
   }
   else {
     LogMan::Msg::E("Unhandled JIT SIGBUS: PC: %p Instruction: 0x%08x\n", PC, PC[0]);
     return false;
   }
 
-  // Back up one instruction and have another go
-  _mcontext->pc -= 4;
   vixl::aarch64::CPU::EnsureIAndDCacheCoherency(&PC[-1], 16);
   return true;
 }
@@ -529,7 +684,7 @@ JITCore::JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalThreadSt
 
     CTX->SignalDelegation->RegisterHostSignalHandler(SIGBUS, [](FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext) -> bool {
       JITCore *Core = reinterpret_cast<JITCore*>(Thread->CPUBackend.get());
-      return Core->HandleSIGBUS(Signal, info, ucontext);
+      return Core->HandleSIGBUS(Thread->State.State.rip, Signal, info, ucontext);
     });
 
     CTX->SignalDelegation->RegisterHostSignalHandler(SignalDelegator::SIGNAL_FOR_PAUSE, [](FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext) -> bool {
@@ -704,7 +859,8 @@ void *JITCore::CompileCode([[maybe_unused]] FEXCore::IR::IRListView<true> const 
   uint32_t SSACount = IR->GetSSACount();
 
   auto HeaderOp = IR->GetHeader();
-  if (HeaderOp->ShouldInterpret) {
+  if (HeaderOp->ShouldInterpret)
+  {
     return reinterpret_cast<void*>(ThreadSharedData.InterpreterFallbackHelperAddress);
   }
 

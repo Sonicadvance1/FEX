@@ -102,6 +102,10 @@ endif()
 add_definitions(-Wno-trigraphs)
 add_definitions(-DGLOBAL_DATA_DIRECTORY="${DATA_DIRECTORY}/")
 
+
+add_subdirectory(External/Allocator/)
+include_directories(External/Allocator/)
+
 add_subdirectory(External/cpp-optparse/)
 include_directories(External/cpp-optparse/)
 

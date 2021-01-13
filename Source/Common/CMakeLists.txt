@@ -1,5 +1,6 @@
 set(NAME Common)
 set(SRCS
+  ArenaAllocator.cpp
   ArgumentLoader.cpp
   EnvironmentLoader.cpp
   Config.cpp

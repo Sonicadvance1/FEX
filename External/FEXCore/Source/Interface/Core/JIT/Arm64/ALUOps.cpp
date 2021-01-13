@@ -142,7 +142,6 @@ DEF_OP(Mul) {
   switch (OpSize) {
     case 4:
       mul(Dst.W(), GetReg<RA_32>(Op->Header.Args[0].ID()), GetReg<RA_32>(Op->Header.Args[1].ID()));
-      sxtw(Dst, Dst);
     break;
     case 8:
       mul(Dst, GetReg<RA_64>(Op->Header.Args[0].ID()), GetReg<RA_64>(Op->Header.Args[1].ID()));
@@ -1002,7 +1001,7 @@ DEF_OP(VExtractToGPR) {
 }
 
 DEF_OP(Float_ToGPR_ZU) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(Float_ToGPR_ZS) {
@@ -1016,7 +1015,7 @@ DEF_OP(Float_ToGPR_ZS) {
 }
 
 DEF_OP(Float_ToGPR_U) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 DEF_OP(Float_ToGPR_S) {
@@ -1075,7 +1074,7 @@ DEF_OP(FCmp) {
 }
 
 DEF_OP(F80Cmp) {
-  LogMan::Msg::D("Unimplemented");
+  LogMan::Msg::A("Unimplemented: '%s'", __func__);
 }
 
 #undef DEF_OP
