@@ -10,7 +10,7 @@
 
 namespace FEX::HLE::x32 {
   void RegisterEpoll();
-  void RegisterFD();
+  void RegisterFD(FEX::HLE::SyscallHandler *Handler32);
   void RegisterFS();
   void RegisterInfo();
   void RegisterMemory(bool Has64BitAllocator);
@@ -120,7 +120,7 @@ private:
 
     // 32bit specific
     FEX::HLE::x32::RegisterEpoll();
-    FEX::HLE::x32::RegisterFD();
+    FEX::HLE::x32::RegisterFD(this);
     FEX::HLE::x32::RegisterFS();
     FEX::HLE::x32::RegisterInfo();
     FEX::HLE::x32::RegisterMemory(Has64BitAllocator());

@@ -18,6 +18,7 @@
 #include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <sys/uio.h>
+#include <sys/utsname.h>
 #include <sys/vfs.h>
 #include <unistd.h>
 
@@ -47,6 +48,19 @@ namespace FEX::HLE::x32 {
     }
     return Result;
   }
+
+  bool HaveIoctl32(uint32_t) {
+    // We have 32bit compat enabled if the dispatch table for int $0x80 returns something other than -ENOSYS
+    // Specifically it'll return -EBADF with -1 FD to ioctl32
+    uint32_t Result = ioctl32(-1, 0, 0);
+
+    if (Result == -1 && errno == EBADF) {
+      return true;
+    }
+
+    return false;
+  }
+
 #else
   uint32_t ioctl32(int fd, uint32_t request, uint32_t args) {
 #define SYS_ioctl32 442
@@ -56,9 +70,15 @@ namespace FEX::HLE::x32 {
       args);
     return Result;
   }
-#endif
 
-  void RegisterFD() {
+  bool HaveIoctl32(uint32_t KernelVersion) {
+    // XXX: Update this once a kernel has ioctl32 upstreamed
+    const uint32_t MIN_VERSION = (255 << 24) | (0 << 16) | Patch;
+    return KernelVersion >= MIN_VERSION;
+  }
+
+#endif
+  void RegisterFD(FEX::HLE::SyscallHandler *Handler32) {
     REGISTER_SYSCALL_IMPL_X32(poll, [](FEXCore::Core::InternalThreadState *Thread, struct pollfd *fds, nfds_t nfds, int timeout) -> uint64_t {
       uint64_t Result = ::poll(fds, nfds, timeout);
       SYSCALL_ERRNO();
@@ -390,10 +410,13 @@ namespace FEX::HLE::x32 {
       SYSCALL_ERRNO();
     });
 
-    REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::InternalThreadState *Thread, int fd, uint32_t request, uint32_t args) -> uint64_t {
-      uint64_t Result = ioctl32(fd, request, args);
-      SYSCALL_ERRNO();
-    });
+    if (HaveIoctl32(Handler32->GetHostKernelVersion())) {
+      // If the host doesn't have ioctl32 then we can't support this
+      REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::InternalThreadState *Thread, int fd, uint32_t request, uint32_t args) -> uint64_t {
+        uint64_t Result = ioctl32(fd, request, args);
+        SYSCALL_ERRNO();
+      });
+    }
 
     REGISTER_SYSCALL_IMPL_X32(getdents, [](FEXCore::Core::InternalThreadState *Thread, int fd, void *dirp, uint32_t count) -> uint64_t {
 #ifdef SYS_getdents
