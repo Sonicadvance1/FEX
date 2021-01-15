@@ -102,6 +102,8 @@ public:
   FEXCore::Config::Value<uint64_t> ThreadsConfig{FEXCore::Config::CONFIG_EMULATED_CPU_CORES, 1};
   FEXCore::Config::Value<bool> Is64BitMode{FEXCore::Config::CONFIG_IS64BIT_MODE, 0};
 
+  uint32_t GetHostKernelVersion() const { return HostKernelVersion; }
+
 protected:
   std::vector<SyscallFunctionDefinition> Definitions{};
   std::mutex MMapMutex;
@@ -110,6 +112,9 @@ protected:
   uint64_t DataSpace {};
   uint64_t DataSpaceSize {};
   uint64_t DataSpaceMaxSize {};
+
+  // (Major << 24) | (Minor << 16) | Patch
+  uint32_t HostKernelVersion{};
 
 private:
 
@@ -122,6 +127,8 @@ private:
   #ifdef DEBUG_STRACE
     void Strace(FEXCore::HLE::SyscallArguments *Args, uint64_t Ret);
   #endif
+
+  void CalculateHostKernelVersion();
 };
 
 FEX::HLE::SyscallHandler *CreateHandler(FEXCore::Context::OperatingMode Mode,
