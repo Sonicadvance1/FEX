@@ -47,10 +47,52 @@ namespace FEX::HLE::x32 {
         : "memory");
     return Result;
   }
+  bool HasIOCTL32() {
+    return true;
+  }
 #else
+  constexpr uint32_t arm_SYS_getpid = 20;
+  constexpr uint32_t arm_SYS_ioctl =  54;
+  __attribute__((naked))
+  __attribute__((noinline))
+  uint64_t syscall32 (
+    uint32_t num,
+    ...
+    ) {
+    __asm volatile(
+    R"(
+    orr w8, w0, #0x80000000;
+    uxtw x0, w1;
+    uxtw x1, w2;
+    uxtw x2, w3;
+    uxtw x3, w4;
+    uxtw x4, w5;
+    uxtw x5, w6;
+    uxtw x6, w7;
+    svc 0x0;
+    ret;
+    )"
+    ::: "memory");
+  }
+
+  __attribute__((naked))
+  __attribute__((noinline))
   uint32_t ioctl32(int fd, uint32_t request, uint32_t args) {
-    // Not currently implemented on AArch64
-    return -ENOSYS;
+    __asm volatile(
+    R"(
+    uxtw x0, w0;
+    uxtw x1, w1;
+    uxtw x2, w2;
+    movz w8, %[Syscall];
+    orr w8, w8, #0x80000000;
+    svc 0x0;
+    ret;
+    )"
+    :: [Syscall] "i" (arm_SYS_ioctl)
+    : "memory");
+  }
+  bool HasIOCTL32() {
+    return syscall32(arm_SYS_getpid) != -ENOSYS;
   }
 #endif
 
@@ -386,9 +428,16 @@ namespace FEX::HLE::x32 {
       SYSCALL_ERRNO();
     });
 
-    REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::CpuStateFrame *Frame, int fd, uint32_t request, uint32_t args) -> uint64_t {
-      return ioctl32(fd, request, args);
-    });
+    if (HasIOCTL32()) {
+      REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::CpuStateFrame *Frame, int fd, uint32_t request, uint32_t args) -> uint64_t {
+        return ioctl32(fd, request, args);
+      });
+    }
+    else {
+      REGISTER_SYSCALL_IMPL_X32(ioctl, [](FEXCore::Core::CpuStateFrame *Frame, int fd, uint32_t request, uint32_t args) -> uint64_t {
+        return -ENOSYS;
+      });
+    }
 
     REGISTER_SYSCALL_IMPL_X32(getdents, [](FEXCore::Core::CpuStateFrame *Frame, int fd, void *dirp, uint32_t count) -> uint64_t {
 #ifdef SYS_getdents

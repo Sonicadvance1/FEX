@@ -101,7 +101,7 @@ namespace FEX::HLE::x32 {
         }
 
         if (AnyFlagsSet(flags, CLONE_SYSVSEM | CLONE_FS |  CLONE_FILES | CLONE_SIGHAND | CLONE_VM)) {
-          ERROR_AND_DIE("clone: Unsuported flags w/o CLONE_THREAD (Shared Resources), %X", flags);
+          LogMan::Msg::I("clone: Unsuported flags w/o CLONE_THREAD (Shared Resources), %X", flags);
         }
 
         // CLONE_PARENT is ignored (Implied by CLONE_THREAD)
@@ -109,7 +109,7 @@ namespace FEX::HLE::x32 {
       } else {
 
         if (!AllFlagsSet(flags, CLONE_SYSVSEM | CLONE_FS |  CLONE_FILES | CLONE_SIGHAND)) {
-          ERROR_AND_DIE("clone: CLONE_THREAD: Unsuported flags w/ CLONE_THREAD (Shared Resources), %X", flags);
+          LogMan::Msg::I("clone: CLONE_THREAD: Unsuported flags w/ CLONE_THREAD (Shared Resources), %X", flags);
         }
 
         auto NewThread = FEX::HLE::CreateNewThread(Thread->CTX, Frame, flags, stack, parent_tid, child_tid, tls);
