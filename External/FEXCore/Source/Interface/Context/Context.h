@@ -4,6 +4,7 @@
 #include "Interface/Core/Frontend.h"
 #include "Interface/Core/HostFeatures.h"
 #include "Interface/Core/InternalThreadState.h"
+#include "Interface/Core/InstructionTelemetry.h"
 #include "Interface/Core/X86HelperGen.h"
 #include "Interface/IR/PassManager.h"
 #include "Interface/IR/Passes/RegisterAllocationPass.h"
@@ -207,7 +208,7 @@ namespace FEXCore::Context {
 
     // Public for threading
     void ExecutionThread(FEXCore::Core::InternalThreadState *Thread);
-
+    FEXCore::InstructionTelemetry::InstDetails InstTelem{};
   protected:
     void ClearCodeCache(FEXCore::Core::InternalThreadState *Thread, bool AlsoClearIRCache);
 

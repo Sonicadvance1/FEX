@@ -179,6 +179,8 @@ namespace FEXCore::Context {
         free(Entry.second.RAData);
       }
     }
+
+    InstTelem.SaveResults();
   }
 
   bool Context::InitCore(FEXCore::CodeLoader *Loader) {
