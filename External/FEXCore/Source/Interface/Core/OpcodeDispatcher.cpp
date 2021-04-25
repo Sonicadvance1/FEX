@@ -6449,7 +6449,7 @@ void OpDispatchBuilder::SetX87Top(OrderedNode *Value) {
 
 template<size_t width>
 void OpDispatchBuilder::FLD(OpcodeArgs) {
-
+  AtomicCountOp(Op, FEXCore::InstructionTelemetry::InstructionType::OP_FLD);
   // Update TOP
   auto orig_top = GetX87Top();
   auto mask = _Constant(7);
