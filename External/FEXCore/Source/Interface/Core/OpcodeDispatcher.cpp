@@ -6598,6 +6598,11 @@ void OpDispatchBuilder::FIST(OpcodeArgs) {
   }
 }
 
+void OpDispatchBuilder::AtomicCountOp(OpcodeArgs, uint64_t Opcode) {
+  auto Details = CTX->InstTelem.AddInstructionData(Op->PC, Opcode, Op->TableInfo);
+  _AtomicFetchAdd(_Constant((uint64_t)Details->Count), _Constant(1), 8);
+}
+
 template <size_t width, bool Integer, OpDispatchBuilder::OpResult ResInST0>
 void OpDispatchBuilder::FADD(OpcodeArgs) {
 

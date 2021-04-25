@@ -111,6 +111,7 @@ public:
 
   // Dispatch builder functions
 #define OpcodeArgs [[maybe_unused]] FEXCore::X86Tables::DecodedOp Op
+  void AtomicCountOp(OpcodeArgs, uint64_t Opcode);
   void UnhandledOp(OpcodeArgs);
   template<uint32_t SrcIndex>
   void MOVGPROp(OpcodeArgs);
