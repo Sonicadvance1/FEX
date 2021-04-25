@@ -49,7 +49,24 @@ namespace FEXCore::InstructionTelemetry {
     OP_FBSTP,
     OP_FBLD,
     OP_FLD,
+
+    // Long DIV
+    OP_SIGNEDLDIV,
+    OP_UNSIGNEDLDIV,
+
+    // Remainder was overwritten, so unneeded
+    OP_SIGNEDLDIV_REMAINDER_REMOVED,
+    OP_UNSIGNEDLDIV_REMAINDER_REMOVED,
+
+    // Upper 64-bits were a sext/zext, so can be converted to a 64-bit div
+    // CQO -> Sext RAX -> RDX:RAX
+    // Zext usually means RDX = `xor edx, edx`
+    OP_SIGNEDLDIV_UPPERBITS_EXT,
+    OP_UNSIGNEDLDIV_UPPERBITS_EXT,
   };
+
+  static_assert(OP_SIGNEDLDIV == 37, "What");
+  static_assert(OP_UNSIGNEDLDIV == 38, "What");
 
   struct ProgramRange {
     uint64_t Begin, End;

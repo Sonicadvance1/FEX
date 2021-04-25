@@ -133,7 +133,7 @@ namespace FEXCore::InstructionTelemetry {
       }
     }
 
-    return {};
+    return {0, 0, "<Unknown>"};
   }
 
   void InstDetails::SaveResults() {
@@ -167,7 +167,7 @@ namespace FEXCore::InstructionTelemetry {
           *PIDDetail->second.Count += *Detail.second.Count;
         }
       }
-      fprintf(fp, "COUNT, RIP, Base, End, Program, Total\n");
+      fprintf(fp, "TYPE, COUNT, RIP, Base, End, Program, Total\n");
 
       for (auto &Detail : PIDDetails) {
         uint64_t Count = std::atomic_load<uint64_t>((std::atomic<uint64_t>*)Detail.second.Count);
@@ -176,7 +176,8 @@ namespace FEXCore::InstructionTelemetry {
 
       for (auto &Detail : PIDDetails) {
         uint64_t Count = std::atomic_load<uint64_t>((std::atomic<uint64_t>*)Detail.second.Count);
-        fprintf(fp, "%016ld, 0x%016lx, 0x%lx, 0x%lx, %s, %016ld\n",
+        fprintf(fp, "%016ld, %016ld, 0x%016lx, 0x%lx, 0x%lx, %s, %016ld\n",
+          Detail.second.InstructionType,
           Count,
           Detail.first,
           Detail.second.ProgramBase, Detail.second.ProgramEnd, Detail.second.ProgramName.c_str(),
@@ -200,20 +201,24 @@ namespace FEXCore::InstructionTelemetry {
 
   DetailStruct *InstDetails::AddInstructionData(uint64_t RIP, uint64_t InstructionType, FEXCore::X86Tables::X86InstInfo const* TableInfo) {
     ProgramRange ProgramName(FindProgramName(RIP));
+    std::string const *ProgramNameDB{};
     {
       std::unique_lock<std::mutex> lk {ProgramNamesLock};
       if (ProgramNames.find(ProgramName.Name) == ProgramNames.end()) {
         ProgramNames.emplace(ProgramName.Name);
       }
+
+      auto it = ProgramNames.find(ProgramName.Name);
+      ProgramNameDB = &(*it);
     }
 
     std::pair<uint32_t, uint32_t> Key(RIP, ::gettid());
     std::unique_lock<std::mutex> lk {DetailsLock};
     auto Detail = Details.find(Key);
-    auto ProgramNameDB = ProgramNames.find(ProgramName.Name);
     if (Detail == Details.end()) {
       DetailStruct NewData = {
         .Count = AllocateAtomicCounter(GetTLSPool()),
+        .InstructionType = InstructionType,
         .ProgramName = *ProgramNameDB,
         .ProgramBase = ProgramName.Begin,
         .ProgramEnd = ProgramName.End,

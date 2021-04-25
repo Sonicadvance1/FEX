@@ -3689,6 +3689,7 @@ void OpDispatchBuilder::DIVOp(OpcodeArgs) {
     OrderedNode *Src1 = _LoadContext(Size, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RAX]), GPRClass);
     OrderedNode *Src2 = _LoadContext(Size, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RDX]), GPRClass);
 
+    AtomicCountOp(Op, FEXCore::InstructionTelemetry::InstructionType::OP_UNSIGNEDLDIV);
     auto UDivOp = _LUDiv(Src1, Src2, Divisor);
     auto URemOp = _LURem(Src1, Src2, Divisor);
 
@@ -3740,6 +3741,7 @@ void OpDispatchBuilder::IDIVOp(OpcodeArgs) {
     OrderedNode *Src1 = _LoadContext(Size, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RAX]), GPRClass);
     OrderedNode *Src2 = _LoadContext(Size, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RDX]), GPRClass);
 
+    AtomicCountOp(Op, FEXCore::InstructionTelemetry::InstructionType::OP_SIGNEDLDIV);
     auto UDivOp = _LDiv(Src1, Src2, Divisor);
     auto URemOp = _LRem(Src1, Src2, Divisor);
 
@@ -6449,7 +6451,6 @@ void OpDispatchBuilder::SetX87Top(OrderedNode *Value) {
 
 template<size_t width>
 void OpDispatchBuilder::FLD(OpcodeArgs) {
-  AtomicCountOp(Op, FEXCore::InstructionTelemetry::InstructionType::OP_FLD);
   // Update TOP
   auto orig_top = GetX87Top();
   auto mask = _Constant(7);

@@ -40,6 +40,7 @@ $end_info$
 #include "Interface/Core/GdbServer.h"
 
 namespace FEXCore::CPU {
+  FEXCore::InstructionTelemetry::InstDetails *InstTelem{};
   bool CreateCPUCore(FEXCore::Context::Context *CTX) {
     // This should be used for generating things that are shared between threads
     CTX->CPUID.Init(CTX);
@@ -152,6 +153,7 @@ namespace FEXCore::Context {
     else {
       StopGdbServer();
     }
+    CPU::InstTelem = &this->InstTelem;
   }
 
   Context::~Context() {
