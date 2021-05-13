@@ -545,7 +545,7 @@ uint64_t MemAllocator32Bit::shmdt(const void* shmaddr) {
 class MemAllocatorPassThrough final : public MemAllocator {
 public:
   void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) override {
-    uint64_t Result = (uint64_t)::mmap(addr, length, prot, flags, fd, offset);
+    uint64_t Result = (uint64_t)::syscall(0x80000000 | SYS_mmap, addr, length, prot, flags, fd, offset);
     if (Result == ~0ULL) {
       return reinterpret_cast<void*>(-errno);
     }
@@ -553,12 +553,12 @@ public:
   }
 
   int munmap(void *addr, size_t length) override {
-    uint64_t Result = (uint64_t)::munmap(addr, length);
+    uint64_t Result = (uint64_t)::syscall(SYS_munmap, addr, length);
     SYSCALL_ERRNO();
   }
 
   void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) override {
-    uint64_t Result = (uint64_t)::mremap(old_address, old_size, new_size, flags, new_address);
+    uint64_t Result = (uint64_t)::syscall(0x80000000 | SYS_mremap, old_address, old_size, new_size, flags, new_address);
     if (Result == ~0ULL) {
       return reinterpret_cast<void*>(-errno);
     }

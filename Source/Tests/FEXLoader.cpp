@@ -30,6 +30,9 @@ $end_info$
 #include <filesystem>
 #include <algorithm>
 #include <set>
+#include <dlfcn.h>
+#include <sys/prctl.h>
+#include <signal.h>
 
 namespace {
 static bool SilentLog;
@@ -160,6 +163,130 @@ bool IsInterpreterInstalled() {
          std::filesystem::exists("/proc/sys/fs/binfmt_misc/FEX-x86_64");
 }
 
+bool HandleSIGSYS(int Signal, void *info, void *ucontext) {
+  ucontext_t* _context = (ucontext_t*)ucontext;
+  siginfo_t *HostSigInfo = reinterpret_cast<siginfo_t*>(info);
+  uint32_t Syscall = _context->uc_mcontext.gregs[REG_RAX];
+  // This allows us to trap syscalls and put them down either a 32-bit path or a 64-bit path
+  // Depending on where the syscall comes from we need to send it down different paths
+  // 1) For syscalls outside of FEX we want to send mmap and munmap through our 64-bit allocator
+  //  a) Allows dlopen to load elf libraries in to 64-bit space
+  // 2) For syscalls inside of FEX we want them going down either a 32-bit path or 64-bit path
+  //  a) Need to think about this more
+  // 3) Guest space syscalls will get pushed down the correct 32-bit path translated to 64-bit syscalls
+  //  a) Or if the host supports 32-bit syscalls then we use those. Doesn't affect behaviour
+  if (Syscall & 0x80000000U) {
+    // 32-bit support
+    switch (Syscall & ~0x80000000U) {
+      default: {
+        register uint64_t rax __asm__ ("rax") = Syscall & ~0x80000000U;
+        register uint64_t rdi __asm__ ("rdi") = _context->uc_mcontext.gregs[REG_RDI];
+        register uint64_t rsi __asm__ ("rsi") = _context->uc_mcontext.gregs[REG_RSI];
+        register uint64_t rdx __asm__ ("rdx") = _context->uc_mcontext.gregs[REG_RDX];
+        register uint64_t r10 __asm__ ("r10") = _context->uc_mcontext.gregs[REG_R10];
+        register uint64_t r8  __asm__ ("r8")  = _context->uc_mcontext.gregs[REG_R8];
+        register uint64_t r9  __asm__ ("r9")  = _context->uc_mcontext.gregs[REG_R9];
+        __asm volatile("syscall;"
+          : "+r" (rax)
+          : "r" (rdi)
+          , "r" (rsi)
+          , "r" (rdx)
+          , "r" (r10)
+          , "r" (r8)
+          , "r" (r9)
+          : "memory");
+        _context->uc_mcontext.gregs[REG_RAX] = rax;
+        return true;
+        break;
+      }
+    }
+  }
+  switch (Syscall) {
+    case SYS_mmap: {
+      _context->uc_mcontext.gregs[REG_RAX] = reinterpret_cast<uint64_t>(FEXCore::Allocator::mmap(
+        (void*)_context->uc_mcontext.gregs[REG_RDI],
+        (size_t)_context->uc_mcontext.gregs[REG_RSI],
+        (int)_context->uc_mcontext.gregs[REG_RDX],
+        (int)_context->uc_mcontext.gregs[REG_R10],
+        (int)_context->uc_mcontext.gregs[REG_R8],
+        (off_t)_context->uc_mcontext.gregs[REG_R9]));
+      if (_context->uc_mcontext.gregs[REG_RAX] == -1) {
+        _context->uc_mcontext.gregs[REG_RAX] = -errno;
+      }
+      return true;
+      break;
+    }
+    case SYS_munmap: {
+      _context->uc_mcontext.gregs[REG_RAX] = FEXCore::Allocator::munmap(
+        (void*)_context->uc_mcontext.gregs[REG_RDI],
+        (size_t)_context->uc_mcontext.gregs[REG_RSI]);
+      if (_context->uc_mcontext.gregs[REG_RAX] == -1) {
+        _context->uc_mcontext.gregs[REG_RAX] = -errno;
+      }
+      return true;
+      break;
+    }
+    default: {
+      register uint64_t rax __asm__ ("rax") = Syscall;
+      register uint64_t rdi __asm__ ("rdi") = _context->uc_mcontext.gregs[REG_RDI];
+      register uint64_t rsi __asm__ ("rsi") = _context->uc_mcontext.gregs[REG_RSI];
+      register uint64_t rdx __asm__ ("rdx") = _context->uc_mcontext.gregs[REG_RDX];
+      register uint64_t r10 __asm__ ("r10") = _context->uc_mcontext.gregs[REG_R10];
+      register uint64_t r8  __asm__ ("r8")  = _context->uc_mcontext.gregs[REG_R8];
+      register uint64_t r9  __asm__ ("r9")  = _context->uc_mcontext.gregs[REG_R9];
+      __asm volatile("syscall;"
+        : "+r" (rax)
+        : "r" (rdi)
+        , "r" (rsi)
+        , "r" (rdx)
+        , "r" (r10)
+        , "r" (r8)
+        , "r" (r9)
+        : "memory");
+      _context->uc_mcontext.gregs[REG_RAX] = rax;
+      return true;
+      break;
+    }
+  }
+  return false;
+}
+
+void SetupUserDispatch(FEX::HLE::SignalDelegator *SignalDelegation) {
+  // Scan and find our program
+  std::fstream fs;
+  fs.open("/proc/self/maps", std::fstream::in | std::fstream::binary);
+  std::string Line;
+  uint64_t Low{~0ULL};
+  uint64_t High{};
+  while (std::getline(fs, Line)) {
+    if (fs.eof()) break;
+
+    if (Line.find("FEX") == std::string::npos) continue;
+
+    uint64_t Begin, End;
+    if (sscanf(Line.c_str(), "%lx-%lx", &Begin, &End) == 2) {
+      Low = std::min(Low, Begin);
+      High = std::max(High, End);
+    }
+  }
+
+  fs.close();
+
+  LogMan::Msg::D("Allowing through [0x%lx, 0x%lx)", Low, High);
+
+  // Setup our SIGSYS handler first
+  SignalDelegation->RegisterFrontendHostSignalHandler(SIGSYS, [](FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext) -> bool {
+    return HandleSIGSYS(Signal, info, ucontext);
+  });
+
+  // We now have a min/max to search for
+  prctl(PR_SET_SYSCALL_USER_DISPATCH, PR_SYS_DISPATCH_ON, Low, High - Low);
+}
+
+void DisableUserDispatch() {
+  prctl(PR_SET_SYSCALL_USER_DISPATCH, PR_SYS_DISPATCH_OFF, 0, 0);
+}
+
 int main(int argc, char **argv, char **const envp) {
   bool IsInterpreter = RanAsInterpreter(argv[0]);
   LogMan::Throw::InstallHandler(AssertHandler);
@@ -257,6 +384,10 @@ int main(int argc, char **argv, char **const envp) {
 
   FEX::HLE::x32::MemAllocator *Allocator = nullptr;
 
+  std::unique_ptr<FEX::HLE::SignalDelegator> SignalDelegation = std::make_unique<FEX::HLE::SignalDelegator>();
+
+  SetupUserDispatch(SignalDelegation.get());
+
   if (Loader.Is64BitMode()) {
     if (!Loader.MapMemory([](void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
       return FEXCore::Allocator::mmap(addr, length, prot, flags, fd, offset);
@@ -297,8 +428,6 @@ int main(int argc, char **argv, char **const envp) {
   auto CTX = FEXCore::Context::CreateNewContext();
   FEXCore::Context::InitializeContext(CTX);
 
-  std::unique_ptr<FEX::HLE::SignalDelegator> SignalDelegation = std::make_unique<FEX::HLE::SignalDelegator>();
-
   std::unique_ptr<FEX::HLE::SyscallHandler> SyscallHandler{
     Loader.Is64BitMode() ?
       FEX::HLE::x64::CreateHandler(CTX, SignalDelegation.get()) :
@@ -315,6 +444,11 @@ int main(int argc, char **argv, char **const envp) {
   FEXCore::Context::SetSyscallHandler(CTX, SyscallHandler.get());
   FEXCore::Context::InitCore(CTX, &Loader);
 
+  // dlopen testing
+  printf("Test\n");
+  void *Ptr = dlopen("/mnt/Work/Work/Unicorn_Tests/ELFLoader/Tests/test_lib.so", RTLD_NOW);
+  printf("dlopen result: %p\n", Ptr);
+
   FEXCore::Context::ExitReason ShutdownReason = FEXCore::Context::ExitReason::EXIT_SHUTDOWN;
 
   // There might already be an exit handler, leave it installed
@@ -326,7 +460,6 @@ int main(int argc, char **argv, char **const envp) {
       }
     });
   }
-
 
   if (AOTIRLoad() || AOTIRCapture() || AOTIRGenerate()) {
     LogMan::Msg::I("Warning: AOTIR is experimental, and might lead to crashes. Capture doesn't work with programs that fork.");
@@ -468,6 +601,7 @@ int main(int argc, char **argv, char **const envp) {
     }
   }
 
+  DisableUserDispatch();
   auto ProgramStatus = FEXCore::Context::GetProgramStatus(CTX);
 
   SyscallHandler.reset();

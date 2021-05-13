@@ -56,9 +56,15 @@ namespace FEXCore {
 
         static void LoadLib(void *ArgsV) {
 
+            LogMan::Msg::D("LoadLib");
             auto Args = reinterpret_cast<LoadlibArgs*>(ArgsV);
-
             auto CTX = Thread->CTX;
+
+            if (!CTX->Config.Is64BitMode) {
+              // Zext the source
+              // Here we go, ugly casting time
+              Args = reinterpret_cast<LoadlibArgs*>((uint64_t)*(uint32_t*)((uint32_t)(uint64_t)ArgsV + 4));
+            }
 
             auto Name = Args->Name;
             auto CallbackThunks = Args->CallbackThunks;
@@ -95,6 +101,7 @@ namespace FEXCore {
                 int i;
                 for (i = 0; Exports[i].sha256; i++) {
                     That->Thunks[*reinterpret_cast<IR::SHA256Sum*>(Exports[i].sha256)] = Exports[i].Fn;
+                    LogMan::Msg::D("Loading sym: '%s'", (const char*)(Exports[i].sha256));
                 }
 
                 LogMan::Msg::D("Loaded %d syms", i);
@@ -106,12 +113,15 @@ namespace FEXCore {
         ThunkedFunction* LookupThunk(const IR::SHA256Sum &sha256) {
 
             std::shared_lock lk(ThunksMutex);
+            LogMan::Msg::D("LookupThunk: '%s'", sha256.data);
 
             auto it = Thunks.find(sha256);
 
             if (it != Thunks.end()) {
+                LogMan::Msg::D("Found a function");
                 return it->second;
             } else {
+                LogMan::Msg::D("Failed Thunk lookup");
                 return nullptr;
             }
         }

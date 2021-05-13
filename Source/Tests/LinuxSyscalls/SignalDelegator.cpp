@@ -21,6 +21,12 @@ $end_info$
 #include <unistd.h>
 
 namespace FEX::HLE {
+  __attribute__((naked))
+  static void sigrestore() {
+    __asm volatile("syscall;"
+      :: "a" (0xF)
+      : "memory");
+  }
   constexpr static uint32_t SS_AUTODISARM = (1U << 31);
   constexpr static uint32_t X86_MINSIGSTKSZ  = 0x2000U;
 
@@ -88,6 +94,11 @@ namespace FEX::HLE {
     siginfo_t *SigInfo = static_cast<siginfo_t*>(Info);
     auto Thread = ThreadData.Thread;
     SignalHandler &Handler = HostHandlers[Signal];
+
+    if (Handler.FrontendHandler &&
+        Handler.FrontendHandler(Thread, Signal, Info, UContext)) {
+      return;
+    }
 
     if (!Thread) {
       LogMan::Msg::E("[%d] Thread has received a signal and hasn't registered itself with the delegate! Programming error!", gettid());
@@ -188,21 +199,21 @@ namespace FEX::HLE {
     // Unhandled crash
     // Call back in to the previous handler
     if (Handler.OldAction.sa_flags & SA_SIGINFO) {
-      Handler.OldAction.sa_sigaction(Signal, static_cast<siginfo_t*>(Info), UContext);
+      Handler.OldAction.sigaction(Signal, static_cast<siginfo_t*>(Info), UContext);
     }
-    else if (Handler.OldAction.sa_handler == SIG_IGN ||
-      (Handler.OldAction.sa_handler == SIG_DFL &&
+    else if (Handler.OldAction.handler == SIG_IGN ||
+      (Handler.OldAction.handler == SIG_DFL &&
        Handler.DefaultBehaviour == DEFAULT_IGNORE)) {
       // Do nothing
     }
-    else if (Handler.OldAction.sa_handler == SIG_DFL &&
+    else if (Handler.OldAction.handler == SIG_DFL &&
       (Handler.DefaultBehaviour == DEFAULT_COREDUMP ||
        Handler.DefaultBehaviour == DEFAULT_TERM)) {
       // Reassign back to DFL and crash
       signal(Signal, SIG_DFL);
     }
     else {
-      Handler.OldAction.sa_handler(Signal);
+      Handler.OldAction.handler(Signal);
     }
   }
 
@@ -214,13 +225,17 @@ namespace FEX::HLE {
     }
 
     // Now install the thunk handler
-    SignalHandler.HostAction.sa_sigaction = &SignalHandlerThunk;
+    SignalHandler.HostAction.sigaction = &SignalHandlerThunk;
     SignalHandler.HostAction.sa_flags = SA_SIGINFO | SA_RESTART | SA_ONSTACK;
 
     if (SignalHandler.GuestAction.sa_flags & SA_NODEFER) {
       // If the guest is using NODEFER then make sure to set it for the host as well
       SignalHandler.HostAction.sa_flags |= SA_NODEFER;
     }
+
+#define SA_RESTORER 0x04000000
+    SignalHandler.HostAction.sa_flags |= SA_RESTORER;
+    SignalHandler.HostAction.restorer = sigrestore;
 
     /*
      * XXX: This isn't quite as straightforward as a memcmp
@@ -238,7 +253,7 @@ namespace FEX::HLE {
     */
 
     // We don't care about the previous handler in this case
-    int Result = sigaction(Signal, &SignalHandler.HostAction, &SignalHandler.OldAction);
+    int Result = ::syscall(SYS_rt_sigaction, Signal, &SignalHandler.HostAction, &SignalHandler.OldAction, 8);
     if (Result < 0) {
       LogMan::Msg::E("Failed to install host signal thunk for signal %d: %s", Signal, strerror(errno));
       return false;
@@ -259,6 +274,10 @@ namespace FEX::HLE {
       Changed = true;
     }
 
+#define SA_RESTORER 0x04000000
+    SignalHandler.HostAction.sa_flags |= SA_RESTORER;
+    SignalHandler.HostAction.restorer = sigrestore;
+
     /*
     if ((SignalHandler.GuestAction.sa_mask ^ SignalHandler.HostAction.sa_mask) & ~(SIGILL | SIGBUS)) {
       // If the signal ignore mask has updated (avoiding the two we need for the host) then we need to update
@@ -274,7 +293,7 @@ namespace FEX::HLE {
     }
 
     // Only update our host signal here
-    int Result = sigaction(Signal, &SignalHandler.HostAction, nullptr);
+    int Result = ::syscall(SYS_rt_sigaction, Signal, &SignalHandler.HostAction, nullptr, 8);
     if (Result < 0) {
       LogMan::Msg::E("Failed to update host signal thunk for signal %d: %s", Signal, strerror(errno));
     }
@@ -331,7 +350,7 @@ namespace FEX::HLE {
           ) {
         continue;
       }
-      sigaction(i, &HostHandlers[i].OldAction, nullptr);
+      ::syscall(SYS_rt_sigaction, i, &HostHandlers[i].OldAction, nullptr, 8);
       HostHandlers[i].Installed = false;
     }
     GlobalDelegator = nullptr;

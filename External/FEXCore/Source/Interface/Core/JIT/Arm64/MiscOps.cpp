@@ -36,6 +36,23 @@ DEF_OP(Fence) {
 }
 
 DEF_OP(Break) {
+  auto DoStop = [&]() {
+    // Time to quit
+    // Set our stack to the starting stack location
+    ldr(TMP1, MemOperand(STATE, offsetof(FEXCore::Core::CpuStateFrame, ReturningStackLocation)));
+    add(sp, TMP1, 0);
+
+    // Now we need to jump to the thread stop handler
+    LoadConstant(TMP1, ThreadSharedData.Dispatcher->ThreadStopHandlerAddressSpillSRA);
+    br(TMP1);
+  };
+  auto DoPause =[&]() {
+    ResetStack();
+
+    LoadConstant(TMP1, ThreadSharedData.Dispatcher->ThreadPauseHandlerAddressSpillSRA);
+    br(TMP1);
+  };
+
   auto Op = IROp->C<IR::IROp_Break>();
   switch (Op->Reason) {
     case 0: // Hard fault
@@ -52,21 +69,16 @@ DEF_OP(Break) {
       hlt(4);
       break;
     case 4: { // HLT
-      // Time to quit
-      // Set our stack to the starting stack location
-      ldr(TMP1, MemOperand(STATE, offsetof(FEXCore::Core::CpuStateFrame, ReturningStackLocation)));
-      add(sp, TMP1, 0);
-
-      // Now we need to jump to the thread stop handler
-      LoadConstant(TMP1, ThreadSharedData.Dispatcher->ThreadStopHandlerAddressSpillSRA);
-      br(TMP1);
+      DoStop();
       break;
     }
     case 6: { // INT3
-      ResetStack();
-
-      LoadConstant(TMP1, ThreadSharedData.Dispatcher->ThreadPauseHandlerAddressSpillSRA);
-      br(TMP1);
+      if (CTX->GetGdbServerStatus()) {
+        DoStop();
+      }
+      else {
+        DoPause();
+      }
       break;
     }
     default: LOGMAN_MSG_A("Unknown Break reason: %d", Op->Reason);

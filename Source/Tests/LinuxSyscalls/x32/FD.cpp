@@ -32,6 +32,37 @@ $end_info$
 ARG_TO_STR(FEX::HLE::x32::compat_ptr<FEX::HLE::x32::sigset_argpack32>, "%lx")
 
 namespace FEX::HLE::x32 {
+#ifdef _M_X86_64
+  uint32_t ioctl_32(int fd, uint32_t cmd, uint32_t args) {
+    uint32_t Result{};
+    __asm volatile("int $0x80;"
+        : "=a" (Result)
+        : "a" (SYSCALL_x86_ioctl)
+        , "b" (fd)
+        , "c" (cmd)
+        , "d" (args)
+        : "memory");
+    return Result;
+  }
+#else
+	constexpr uint32_t arm_SYS_ioctl =  54;
+	__attribute__((naked))
+	__attribute__((noinline))
+	uint32_t ioctl_32(FEXCore::Core::CpuStateFrame*, int fd, uint32_t request, uint32_t args) {
+	__asm volatile(
+			R"(
+				uxtw x0, w1;
+				uxtw x1, w2;
+				uxtw x2, w3;
+				movz w8, %[Syscall];
+				orr w8, w8, #0x80000000;
+				svc 0x0;
+				ret;
+				)"
+			:: [Syscall] "i" (arm_SYS_ioctl)
+			: "memory");
+	}
+#endif
   using fd_set32 = uint32_t;
 #ifdef _M_X86_64
   uint32_t ioctl_32(FEXCore::Core::CpuStateFrame*, int fd, uint32_t cmd, uint32_t args) {

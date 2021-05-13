@@ -20,9 +20,46 @@
 #include <sys/resource.h>
 #include <syscall.h>
 #include <vector>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 static constexpr uint64_t PAGE_SHIFT = 12;
 static constexpr uint64_t PAGE_MASK = (1 << PAGE_SHIFT) - 1;
+__attribute__((naked))
+uint64_t Syscall(...) {
+  /*
+      register uint64_t rdi __asm__ ("rdi") = _context->uc_mcontext.gregs[REG_RDI];
+      register uint64_t rsi __asm__ ("rsi") = _context->uc_mcontext.gregs[REG_RSI];
+      register uint64_t rdx __asm__ ("rdx") = _context->uc_mcontext.gregs[REG_RDX];
+      register uint64_t r10 __asm__ ("r10") = _context->uc_mcontext.gregs[REG_R10];
+      register uint64_t r8  __asm__ ("r8")  = _context->uc_mcontext.gregs[REG_R8];
+      register uint64_t r9  __asm__ ("r9")  = _context->uc_mcontext.gregs[REG_R9];
+      __asm volatile("syscall;"
+        : "+r" (rax)
+        : "r" (rax)
+        , "r" (rdi)
+        , "r" (rsi)
+        , "r" (rdx)
+        , "r" (r10)
+        , "r" (r8)
+        , "r" (r9)
+        : "memory");
+*/
+  __asm volatile(R"(
+    .intel_syntax;
+    mov rax, rdi; # Move cmd in to register
+    mov rdi, rsi;
+    mov rsi, rdx;
+    mov rdx, rcx;
+    mov r10, r8;
+    mov r8, r9;
+    mov r9, [rsp + 8];
+    syscall;
+    retn;)"
+    ::
+    : "memory");
+}
+
 
 namespace Alloc::OSAllocator {
   class OSAllocator_64Bit final : public Alloc::HostAllocator {
@@ -164,9 +201,9 @@ void OSAllocator_64Bit::DetermineVASize() {
       for (int i = 0; i < 64; ++i) {
         // Try grabbing a some of the top pages of the range
         // x86 allocates some high pages in the top end
-        void *Ptr = ::mmap(reinterpret_cast<void*>(Size - PAGE_SIZE * i), PAGE_SIZE, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (Ptr != (void*)~0ULL) {
-          ::munmap(Ptr, PAGE_SIZE);
+        void *Ptr = (void*)Syscall(SYS_mmap, reinterpret_cast<void*>(Size - PAGE_SIZE * i), PAGE_SIZE, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0ULL);
+        if (Ptr < (void*)-4096) {
+          ::Syscall(SYS_munmap, Ptr, PAGE_SIZE);
           if (Ptr == (void*)(Size - PAGE_SIZE * i)) {
             return true;
           }
@@ -188,7 +225,7 @@ void *OSAllocator_64Bit::Mmap(void *addr, size_t length, int prot, int flags, in
       addr < reinterpret_cast<void*>(LOWER_BOUND)) {
     // If we are asked to allocate something outside of the 64-bit space
     // Then we need to just hand this to the OS
-    return ::mmap(addr, length, prot, flags, fd, offset);
+    return (void*)Syscall(SYS_mmap, addr, length, prot, flags, fd, offset);
   }
 
   uint64_t Addr = reinterpret_cast<uint64_t>(addr);
@@ -301,15 +338,12 @@ void *OSAllocator_64Bit::Mmap(void *addr, size_t length, int prot, int flags, in
         AllocatedOffset = Region->SlabInfo->Base + AllocatedPage * PAGE_SIZE;
 
         // We need to setup protections for this
-        void *MMapResult = ::mmap(reinterpret_cast<void*>(AllocatedOffset),
+        void *MMapResult = (void*)Syscall(SYS_mmap, reinterpret_cast<void*>(AllocatedOffset),
           length,
           prot,
           (flags & ~MAP_FIXED_NOREPLACE) | MAP_FIXED,
           fd, offset);
 
-        if (MMapResult == MAP_FAILED) {
-          return std::make_pair(Region, reinterpret_cast<void*>(-errno));
-        }
         return std::make_pair(Region, MMapResult);
       }
     }
@@ -334,14 +368,14 @@ void *OSAllocator_64Bit::Mmap(void *addr, size_t length, int prot, int flags, in
       }
       else {
         // We need to mmap the file to this location
-        void *MMapResult = ::mmap(reinterpret_cast<void*>(Addr),
+        void *MMapResult = (void*)Syscall(SYS_mmap, reinterpret_cast<void*>(Addr),
           length,
           prot,
           (flags & ~MAP_FIXED_NOREPLACE) | MAP_FIXED,
           fd, offset);
 
-        if (MMapResult == MAP_FAILED) {
-          return reinterpret_cast<void*>(-errno);
+        if (MMapResult >= (void*)-4096) {
+          return reinterpret_cast<void*>(-(uint64_t)MMapResult);
         }
 
         AllocatedOffset = Addr;
@@ -423,7 +457,7 @@ int OSAllocator_64Bit::Munmap(void *addr, size_t length) {
   if (addr < reinterpret_cast<void*>(LOWER_BOUND)) {
     // If we are asked to allocate something outside of the 64-bit space
     // Then we need to just hand this to the OS
-    return ::munmap(addr, length);
+    return ::Syscall(SYS_munmap, addr, length);
   }
 
   uint64_t Addr = reinterpret_cast<uint64_t>(addr);
@@ -471,7 +505,7 @@ int OSAllocator_64Bit::Munmap(void *addr, size_t length) {
         // This woul be a bug in the frontend application
         // So be careful with mlock/munlock
         ::madvise(addr, length, MADV_DONTNEED);
-        ::mmap(addr, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        Syscall(SYS_mmap, addr, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0ULL);
       }
 
       (*it)->FreeSpace += FreedPages * 4096;
@@ -537,12 +571,12 @@ OSAllocator_64Bit::PtrCache *OSAllocator_64Bit::Steal32BitIfOldKernel() {
       continue;
     }
 
-    void *Ptr = ::mmap(reinterpret_cast<void*>(MemoryOffset), AllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+    void *Ptr = (void*)Syscall(SYS_mmap, reinterpret_cast<void*>(MemoryOffset), AllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0ULL);
 
     // If we managed to allocate and not get the address we want then unmap it
     // This happens with kernels older than 4.17
     if (reinterpret_cast<uintptr_t>(Ptr) + AllocationSize > UPPER_BOUND_32) {
-      munmap(Ptr, AllocationSize);
+      ::Syscall(SYS_munmap, Ptr, AllocationSize);
       Ptr = reinterpret_cast<void*>(~0ULL);
     }
 
@@ -594,7 +628,7 @@ void OSAllocator_64Bit::Clear32BitOnOldKernel(OSAllocator_64Bit::PtrCache *Base)
   for (size_t i = 0;; ++i) {
     void *Ptr = reinterpret_cast<void*>(Base[i].Ptr);
     size_t Size = Base[i].Size;
-    munmap(Ptr, Size);
+    ::Syscall(SYS_munmap, Ptr, Size);
     if (Ptr == Base) {
       break;
     }
@@ -635,19 +669,19 @@ OSAllocator_64Bit::OSAllocator_64Bit() {
       continue;
     }
 
-    void *Ptr = ::mmap(reinterpret_cast<void*>(MemoryOffset), AllocationSize, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+    void *Ptr = (void*)Syscall(SYS_mmap, reinterpret_cast<void*>(MemoryOffset), AllocationSize, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0ULL);
 
     // If we managed to allocate and not get the address we want then unmap it
     // This happens with kernels older than 4.17
     if (reinterpret_cast<uintptr_t>(Ptr) != MemoryOffset &&
         reinterpret_cast<uintptr_t>(Ptr) < LOWER_BOUND) {
-      munmap(Ptr, AllocationSize);
+      ::Syscall(SYS_munmap, Ptr, AllocationSize);
       Ptr = reinterpret_cast<void*>(~0ULL);
     }
 
     // If we failed to allocate and we are on the smallest allocation size then just continue onward
     // This page was unmappable
-    if (reinterpret_cast<uintptr_t>(Ptr) == ~0ULL && CurrentSizeIndex == AllocationSizeMaxIndex) {
+    if (reinterpret_cast<uintptr_t>(Ptr) >= -4096 && CurrentSizeIndex == AllocationSizeMaxIndex) {
       CurrentSizeIndex = 0;
       MemoryOffset += AllocationSize;
       continue;
@@ -655,7 +689,7 @@ OSAllocator_64Bit::OSAllocator_64Bit() {
 
     // Congratulations we were able to map this bit
     // Reset and claim it was available
-    if (reinterpret_cast<uintptr_t>(Ptr) != ~0ULL) {
+    if (reinterpret_cast<uintptr_t>(Ptr) < -4096) {
       if (!ObjectAlloc) {
         // Steal the first allocation for an intrusive allocator
         // Will be mprotected correctly already
@@ -700,12 +734,12 @@ OSAllocator_64Bit::~OSAllocator_64Bit() {
   // Walk the pages and deallocate
   // First walk the live regions
   for (auto it = LiveRegions->begin(); it != LiveRegions->end(); ++it) {
-    ::munmap(reinterpret_cast<void*>((*it)->SlabInfo->Base), (*it)->SlabInfo->RegionSize);
+    ::Syscall(SYS_munmap, reinterpret_cast<void*>((*it)->SlabInfo->Base), (*it)->SlabInfo->RegionSize);
   }
 
   // Now walk the reserved regions
   for (auto it = ReservedRegions->begin(); it != ReservedRegions->end(); ++it) {
-    ::munmap(reinterpret_cast<void*>((*it)->Base), (*it)->RegionSize);
+    ::Syscall(SYS_munmap, reinterpret_cast<void*>((*it)->Base), (*it)->RegionSize);
   }
 }
 

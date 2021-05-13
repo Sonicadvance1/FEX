@@ -106,8 +106,16 @@ void OpDispatchBuilder::ThunkOp(OpcodeArgs) {
 
   sha256 = (uint8_t *)(Op->PC + 2);
 
+  OrderedNode *Args{};
+  if (CTX->Config.Is64BitMode) {
+    Args = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RDI]), GPRClass);
+  }
+  else {
+    Args = _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RSP]), GPRClass);
+  }
+
   _Thunk(
-    _LoadContext(GPRSize, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RDI]), GPRClass),
+    Args,
     *reinterpret_cast<SHA256Sum*>(sha256)
   );
 

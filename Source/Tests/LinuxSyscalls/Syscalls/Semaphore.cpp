@@ -20,7 +20,55 @@ namespace FEX::HLE {
     });
 
     REGISTER_SYSCALL_IMPL(semctl, [](FEXCore::Core::CpuStateFrame *Frame, int semid, int semnum, int cmd, void* semun) -> uint64_t {
-      uint64_t Result = ::semctl(semid, semnum, cmd, semun);
+      // semun struct doesn't match between x86-64 and aarch64
+      uint64_t Result{};
+      switch (cmd) {
+        case IPC_SET: {
+          break;
+        }
+        case IPC_STAT: {
+          break;
+        }
+        case IPC_INFO: {
+          break;
+        }
+        case SEM_INFO: {
+          break;
+        }
+        case SEM_STAT: {
+          break;
+        }
+        case SEM_STAT_ANY: {
+          break;
+        }
+        case GETALL: {
+          break;
+        }
+        case GETNCNT: {
+          break;
+        }
+        case GETPID: {
+          break;
+        }
+        case GETVAL: {
+          break;
+        }
+        case GETZCNT: {
+          break;
+        }
+        case SETALL: {
+          break;
+        }
+        case SETVAL: {
+          break;
+        }
+        // Forward
+        case IPC_RMID: {
+          Result = ::semctl(semid, semnum, cmd, semun);
+          break;
+        }
+        default: LOGMAN_MSG_A("Unhandled shmctl cmd: %d", cmd); return -EINVAL; break;
+      }
       SYSCALL_ERRNO();
     });
   }
