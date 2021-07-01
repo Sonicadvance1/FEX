@@ -352,8 +352,15 @@ int main(int argc, char **argv, char **const envp) {
   std::string Program = Args[0];
 
   // These layers load on initialization
-  FEXCore::Config::AddLayer(std::make_unique<FEX::Config::AppLoader>(std::filesystem::path(Program).filename(), true));
-  FEXCore::Config::AddLayer(std::make_unique<FEX::Config::AppLoader>(std::filesystem::path(Program).filename(), false));
+  auto ProgramName = std::filesystem::path(Program).filename();
+  FEXCore::Config::AddLayer(std::make_unique<FEX::Config::AppLoader>(ProgramName, true));
+  FEXCore::Config::AddLayer(std::make_unique<FEX::Config::AppLoader>(ProgramName, false));
+
+  if (ProgramName == "steamwebhelper") {
+    while (1) {
+      select(0, nullptr, nullptr, nullptr, nullptr);
+    }
+  }
 
   // Reload the meta layer
   FEXCore::Config::ReloadMetaLayer();
