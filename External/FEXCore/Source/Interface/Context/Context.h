@@ -122,6 +122,9 @@ namespace FEXCore::Context {
       FEX_CONFIG_OPT(RootFSPath, ROOTFS);
       FEX_CONFIG_OPT(ThunkHostLibsPath, THUNKHOSTLIBS);
       FEX_CONFIG_OPT(DumpIR, DUMPIR);
+      FEX_CONFIG_OPT(NeedsInterpFallback, DOINTERPFALLBACKS);
+      FEX_CONFIG_OPT(InterpLower, INTERPLOWER);
+      FEX_CONFIG_OPT(InterpUpper, INTERPUPPER);
     } Config;
 
     using IntCallbackReturn =  FEX_NAKED void(*)(FEXCore::Core::InternalThreadState *Thread, volatile void *Host_RSP);
@@ -273,7 +276,7 @@ namespace FEXCore::Context {
     // Public for threading
     void ExecutionThread(FEXCore::Core::InternalThreadState *Thread);
 
-  protected:
+  //protected:
     void ClearCodeCache(FEXCore::Core::InternalThreadState *Thread, bool AlsoClearIRCache);
 
   private:

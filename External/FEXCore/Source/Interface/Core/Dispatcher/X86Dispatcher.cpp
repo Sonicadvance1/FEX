@@ -4,6 +4,8 @@
 #include "Interface/Context/Context.h"
 
 #include <FEXCore/Core/X86Enums.h>
+#include "Interface/Core/JIT/x86_64/JITClass.h"
+
 #include <cmath>
 
 namespace FEXCore::CPU {
@@ -285,6 +287,21 @@ X86Dispatcher::X86Dispatcher(FEXCore::Context::Context *ctx, FEXCore::Core::Inte
     pop(rbx);
 
     ret();
+  }
+
+  {
+    InterpreterJump = getCurr<uint64_t>();
+    if (Thread->InterpreterBackend) {
+      auto Code = Thread->InterpreterBackend->CompileCode(0, nullptr, nullptr, nullptr);
+
+      mov(rax, (uint64_t)Code);
+      mov(rdi, STATE);
+
+      call(rax);
+
+      // Go back to dispatcher
+      jmp(LoopTop);
+    }
   }
   ready();
 

@@ -85,7 +85,8 @@
         "Blocks"
       ],
       "Args": [
-        "uint32_t", "BlockCount"
+        "uint32_t", "BlockCount",
+        "bool", "Interpret"
       ]
     },
     "CodeBlock": {

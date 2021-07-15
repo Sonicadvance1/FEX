@@ -9,6 +9,7 @@ $end_info$
 
 #include "Interface/Core/Dispatcher/X86Dispatcher.h"
 #include "Interface/Core/JIT/x86_64/JITClass.h"
+#include "Interface/Core/Interpreter/InterpreterCore.h"
 #include "Interface/Core/InternalThreadState.h"
 
 #include "Interface/IR/Passes/RegisterAllocationPass.h"
@@ -331,6 +332,8 @@ X86JITCore::X86JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalTh
   RegisterVectorHandlers();
   RegisterEncryptionHandlers();
 
+  Thread->InterpreterBackend = FEXCore::CPU::CreateInterpreterCore(ctx, Thread, true);
+
   if (!CompileThread) {
     DispatcherConfig config;
     config.ExitFunctionLink = reinterpret_cast<uintptr_t>(&ExitFunctionLink);
@@ -590,6 +593,17 @@ void *X86JITCore::CompileCode(uint64_t Entry, [[maybe_unused]] FEXCore::IR::IRLi
   }
 
 	void *GuestEntry = getCurr<void*>();
+
+  auto Header = IR->GetHeader();
+  if (Header->Interpret) {
+    // This makes it safe on cache clear
+    mov(rax, ThreadSharedData.Dispatcher->InterpreterJump);
+    jmp(rax);
+
+    ready();
+    return GuestEntry;
+  }
+
   this->IR = IR;
 
   if (CTX->GetGdbServerStatus()) {

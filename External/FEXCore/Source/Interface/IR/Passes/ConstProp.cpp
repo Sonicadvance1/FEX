@@ -965,6 +965,7 @@ bool ConstProp::ConstantInlining(IREmitter *IREmit, const IRListView& CurrentIR)
 bool ConstProp::Run(IREmitter *IREmit) {
   bool Changed = false;
   auto CurrentIR = IREmit->ViewIR();
+  auto Header = CurrentIR.GetHeader();
   auto OriginalWriteCursor = IREmit->GetWriteCursor();
 
   if (HandleConstantPools(IREmit, CurrentIR)) {
@@ -984,7 +985,7 @@ bool ConstProp::Run(IREmitter *IREmit) {
     }
   }
 
-  if (InlineConstants && ConstantInlining(IREmit, CurrentIR)) {
+  if (Header->Interpret == false && InlineConstants && ConstantInlining(IREmit, CurrentIR)) {
     Changed = true;
   }
 

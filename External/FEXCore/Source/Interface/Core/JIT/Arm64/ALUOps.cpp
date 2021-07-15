@@ -228,11 +228,21 @@ DEF_OP(UDiv) {
   auto Size = OpSize;
   switch (Size) {
     case 1: {
-      udiv(GetReg<RA_32>(Node), GetReg<RA_32>(Op->Header.Args[0].ID()), GetReg<RA_32>(Op->Header.Args[1].ID()));
+      auto Dividend = GetReg<RA_32>(Op->Header.Args[0].ID());
+      auto Divisor = GetReg<RA_32>(Op->Header.Args[1].ID());
+      uxtb(w2, Dividend);
+      uxtb(w3, Divisor);
+
+      udiv(GetReg<RA_32>(Node), w2, w3);
       break;
     }
     case 2: {
-      udiv(GetReg<RA_32>(Node), GetReg<RA_32>(Op->Header.Args[0].ID()), GetReg<RA_32>(Op->Header.Args[1].ID()));
+      auto Dividend = GetReg<RA_32>(Op->Header.Args[0].ID());
+      auto Divisor = GetReg<RA_32>(Op->Header.Args[1].ID());
+      uxth(w2, Dividend);
+      uxth(w3, Divisor);
+
+      udiv(GetReg<RA_32>(Node), w2, w3);
       break;
     }
     case 4: {
@@ -303,17 +313,21 @@ DEF_OP(URem) {
     case 1: {
       auto Dividend = GetReg<RA_32>(Op->Header.Args[0].ID());
       auto Divisor = GetReg<RA_32>(Op->Header.Args[1].ID());
+      uxtb(w2, Dividend);
+      uxtb(w3, Divisor);
 
-      udiv(TMP1.W(), Dividend, Divisor);
-      msub(GetReg<RA_32>(Node), TMP1, Divisor, Dividend);
+      udiv(TMP1.W(), w2, w3);
+      msub(GetReg<RA_32>(Node), TMP1.W(), w3, w2);
     break;
     }
     case 2: {
       auto Dividend = GetReg<RA_32>(Op->Header.Args[0].ID());
       auto Divisor = GetReg<RA_32>(Op->Header.Args[1].ID());
+      uxth(w2, Dividend);
+      uxth(w3, Divisor);
 
-      udiv(TMP1.W(), Dividend, Divisor);
-      msub(GetReg<RA_32>(Node), TMP1, Divisor, Dividend);
+      udiv(TMP1.W(), w2, w3);
+      msub(GetReg<RA_32>(Node), TMP1.W(), w3, w2);
     break;
     }
     case 4: {
@@ -378,6 +392,16 @@ DEF_OP(Or) {
   } else {
     orr(GRS(Node), GRS(Op->Header.Args[0].ID()), GRS(Op->Header.Args[1].ID()));
   }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
 }
 
 DEF_OP(And) {
@@ -387,6 +411,16 @@ DEF_OP(And) {
     and_(GRS(Node), GRS(Op->Header.Args[0].ID()), Const);
   } else {
     and_(GRS(Node), GRS(Op->Header.Args[0].ID()), GRS(Op->Header.Args[1].ID()));
+  }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
   }
 }
 
@@ -398,6 +432,16 @@ DEF_OP(Xor) {
   } else {
     eor(GRS(Node), GRS(Op->Header.Args[0].ID()), GRS(Op->Header.Args[1].ID()));
   }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
 }
 
 DEF_OP(Lshl) {
@@ -408,6 +452,16 @@ DEF_OP(Lshl) {
   } else {
     lslv(GRS(Node), GRS(Op->Header.Args[0].ID()), GRS(Op->Header.Args[1].ID()));
   }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
 }
 
 DEF_OP(Lshr) {
@@ -417,6 +471,16 @@ DEF_OP(Lshr) {
     lsr(GRS(Node), GRS(Op->Header.Args[0].ID()), (unsigned int)Const);
   } else {
     lsrv(GRS(Node), GRS(Op->Header.Args[0].ID()), GRS(Op->Header.Args[1].ID()));
+  }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
   }
 }
 
@@ -478,6 +542,16 @@ DEF_OP(Ror) {
       default: LOGMAN_MSG_A("Unhandled ROR size: %d", OpSize);
     }
   }
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
+
 }
 
 DEF_OP(Extr) {
@@ -495,6 +569,15 @@ DEF_OP(Extr) {
     }
 
     default: LOGMAN_MSG_A("Unhandled EXTR size: %d", OpSize);
+  }
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
   }
 }
 
@@ -701,6 +784,17 @@ DEF_OP(Not) {
       break;
     default: LOGMAN_MSG_A("Unsupported Not size: %d", OpSize);
   }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
+
 }
 
 DEF_OP(Popcount) {
@@ -946,6 +1040,17 @@ DEF_OP(Select) {
   } else {
     csel(GRS(Node), GRS(Op->TrueVal.ID()), GRS(Op->FalseVal.ID()), cc);
   }
+
+  switch (IROp->Size) {
+    case 1:
+      uxtb(GRS(Node), GRS(Node));
+      break;
+    case 2:
+      uxtw(GRS(Node), GRS(Node));
+      break;
+    default: break;
+  }
+
 }
 
 DEF_OP(VExtractToGPR) {

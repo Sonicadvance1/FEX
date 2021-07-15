@@ -613,6 +613,17 @@ namespace FEXCore::Context {
     uint64_t TotalInstructions {0};
     uint64_t TotalInstructionsLength {0};
 
+    uint64_t OriginalDecodeCount = Config.MaxInstPerBlock;
+    // XXX: Full set to interpreter
+    if (Config.NeedsInterpFallback() != 0 &&
+        Config.InterpLower() <= GuestRIP &&
+        Config.InterpUpper() > GuestRIP) {
+      Config.MaxInstPerBlock = 1;
+      //Thread->OpDispatcher.get()->Current_Header->Interpret = Config.NeedsInterpFallback();
+    }
+
+    Config.MaxInstPerBlock = OriginalDecodeCount;
+
     if (!Thread->FrontendDecoder->DecodeInstructionsAtEntry(GuestCode, GuestRIP)) {
       return {};
     }
@@ -773,6 +784,7 @@ namespace FEXCore::Context {
         }
       }
     }
+
     // Run the passmanager over the IR from the dispatcher
     Thread->PassManager->Run(Thread->OpDispatcher.get());
 

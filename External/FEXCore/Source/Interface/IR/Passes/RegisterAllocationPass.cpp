@@ -406,6 +406,7 @@ namespace FEXCore::IR {
       RegisterAllocationData* GetAllocationData() override;
       std::unique_ptr<RegisterAllocationData, RegisterAllocationDataDeleter> PullAllocationData() override;
     private:
+      FEX_CONFIG_OPT(Core, CORE);
       uint32_t SpillPointId;
 
       #define INFO_MAKE(id, Class) ((id) | (Class << 24))
@@ -1524,6 +1525,15 @@ namespace FEXCore::IR {
     bool Changed = false;
 
     auto IR = IREmit->ViewIR();
+
+    auto Header = IR.GetHeader();
+    if (Core == FEXCore::Config::CONFIG_INTERPRETER) {
+      return false;
+    }
+
+    if (Header->Interpret) {
+      return false;
+    }
 
     SpillSlotCount = 0;
     Graph->SpillStack.clear();

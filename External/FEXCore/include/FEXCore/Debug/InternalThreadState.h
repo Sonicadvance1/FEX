@@ -87,6 +87,7 @@ namespace FEXCore::Core {
     std::unique_ptr<FEXCore::IR::OpDispatchBuilder> OpDispatcher;
 
     std::unique_ptr<FEXCore::CPU::CPUBackend> CPUBackend;
+    std::unique_ptr<FEXCore::CPU::CPUBackend> InterpreterBackend;
     std::unique_ptr<FEXCore::LookupCache> LookupCache;
 
     std::unordered_map<uint64_t, LocalIREntry> LocalIRCache;

@@ -61,14 +61,30 @@ void LookupCache::HintUsedRange(uint64_t Address, uint64_t Size) {
 
 void LookupCache::ClearL2Cache() {
   // Clear out the page memory
-  madvise(reinterpret_cast<void*>(PagePointer), ctx->Config.VirtualMemSize / 4096 * 8, MADV_DONTNEED);
-  madvise(reinterpret_cast<void*>(PageMemory), CODE_SIZE, MADV_DONTNEED);
+  if (1) {
+    memset(reinterpret_cast<void*>(PagePointer), 0, ctx->Config.VirtualMemSize / 4096 * 8);
+    memset(reinterpret_cast<void*>(PageMemory), 0, CODE_SIZE);
+  }
+  else {
+    madvise(reinterpret_cast<void*>(PagePointer), ctx->Config.VirtualMemSize / 4096 * 8, MADV_DONTNEED);
+    madvise(reinterpret_cast<void*>(PageMemory), CODE_SIZE, MADV_DONTNEED);
+  }
   AllocateOffset = 0;
+}
+
+void LookupCache::ClearL1Cache() {
+  // Clear L1
+  if (1) {
+    memset(reinterpret_cast<void*>(L1Pointer), 0, L1_SIZE);
+  }
+  else {
+    madvise(reinterpret_cast<void*>(L1Pointer), L1_SIZE, MADV_DONTNEED);
+  }
 }
 
 void LookupCache::ClearCache() {
   // Clear L1
-  madvise(reinterpret_cast<void*>(L1Pointer), L1_SIZE, MADV_DONTNEED);
+  ClearL1Cache();
   // Clear L2
   ClearL2Cache();
   // All code is gone, remove links

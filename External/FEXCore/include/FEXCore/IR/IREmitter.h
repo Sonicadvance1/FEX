@@ -37,6 +37,10 @@ friend class FEXCore::IR::PassManager;
 #define IROP_DISPATCH_HELPERS
 #include <FEXCore/IR/IRDefines.inc>
 
+  IRPair<IROp_IRHeader> _IRHeader(OrderedNode *ssa0, uint32_t BlockCount) {
+    return _IRHeader(ssa0, BlockCount, false);
+  }
+
   IRPair<IROp_Constant> _Constant(uint8_t Size, uint64_t Constant) {
     auto Op = AllocateOp<IROp_Constant, IROps::OP_CONSTANT>();
     uint64_t Mask = ~0ULL >> (Size - 64);

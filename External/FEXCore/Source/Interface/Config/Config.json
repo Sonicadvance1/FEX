@@ -14,6 +14,29 @@
           "[irint, irjit, host]"
         ]
       },
+      "DoInterpFallbacks": {
+        "Type": "uint32",
+        "Default": "false",
+        "ShortArg": "I",
+        "Desc": [
+          "Should we do an interpreter fallback path?"
+        ]
+      },
+
+      "InterpLower": {
+        "Type": "uint64",
+        "Default": "false",
+        "Desc": [
+          "Should we do an interpreter fallback path?"
+        ]
+      },
+      "InterpUpper": {
+        "Type": "uint64",
+        "Default": "false",
+        "Desc": [
+          "Should we do an interpreter fallback path?"
+        ]
+      },
       "Multiblock": {
         "Type": "bool",
         "Default": "true",

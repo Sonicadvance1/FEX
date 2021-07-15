@@ -9,6 +9,7 @@
 #include "Interface/Core/InternalThreadState.h"
 #include "Interface/Core/Interpreter/InterpreterClass.h"
 #include <FEXCore/Utils/LogManager.h>
+#include "Interface/Core/Interpreter/InterpreterCore.h"
 
 #include <FEXCore/Core/CPUBackend.h>
 #include <FEXCore/HLE/SyscallHandler.h>
@@ -31,7 +32,13 @@ static void InterpreterExecution(FEXCore::Core::CpuStateFrame *Frame) {
 
   auto LocalEntry = Thread->LocalIRCache.find(Thread->CurrentFrame->State.rip);
 
-  InterpreterOps::InterpretIR(Thread, Thread->CurrentFrame->State.rip, LocalEntry->second.IR.get(), LocalEntry->second.DebugData.get());
+  auto IR  = LocalEntry->second.IR.get();
+  InterpreterOps::InterpretIR(Thread, Thread->CurrentFrame->State.rip, IR, LocalEntry->second.DebugData.get());
+  if (IR->GetHeader()->Interpret) {
+    // Don't clear if we weren't doing an interpret fallback
+    //Thread->CTX->ClearCodeCache(Thread, false);
+    // Thread->LookupCache->ClearL1Cache();
+  }
 }
 
 bool InterpreterCore::HandleSIGBUS(int Signal, void *info, void *ucontext) {
@@ -95,8 +102,7 @@ bool InterpreterCore::HandleSIGBUS(int Signal, void *info, void *ucontext) {
 }
 
 InterpreterCore::InterpreterCore(FEXCore::Context::Context *ctx, FEXCore::Core::InternalThreadState *Thread, bool CompileThread)
-  : CTX {ctx}
-  , State {Thread} {
+  : CTX {ctx} {
   // Grab our space for temporary data
 
   if (!CompileThread &&

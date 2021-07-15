@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Interface/Core/LookupCache.h"
-#include "Interface/Core/InternalThreadState.h"
 #include "Interface/Core/Dispatcher/Dispatcher.h"
 
 #include <FEXCore/Core/CPUBackend.h>
@@ -35,7 +34,6 @@ public:
 
 private:
   FEXCore::Context::Context *CTX;
-  FEXCore::Core::InternalThreadState *State;
 
   uint32_t AllocateTmpSpace(size_t Size);
 

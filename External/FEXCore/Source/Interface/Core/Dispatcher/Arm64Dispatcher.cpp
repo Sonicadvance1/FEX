@@ -310,6 +310,28 @@ Arm64Dispatcher::Arm64Dispatcher(FEXCore::Context::Context *ctx, FEXCore::Core::
     b(&LoopTop);
   }
 
+  {
+    InterpreterJump = Buffer->GetOffsetAddress<uint64_t>(GetCursorOffset());
+
+    if (Thread->InterpreterBackend) {
+      auto Code = Thread->InterpreterBackend->CompileCode(0, nullptr, nullptr, nullptr);
+
+      if (SRAEnabled)
+        SpillStaticRegs();
+
+      LoadConstant(x2, (uint64_t)Code);
+      mov(x0, STATE);
+
+      blr(x2);
+
+      if (SRAEnabled)
+        FillStaticRegs();
+
+      // Go back to dispatcher
+      b(&LoopTop);
+    }
+  }
+
   place(&l_VirtualMemory);
   place(&l_PagePtr);
   place(&l_L1Ptr);

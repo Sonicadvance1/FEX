@@ -1397,11 +1397,13 @@ void InterpreterOps::InterpretIR(FEXCore::Core::InternalThreadState *Thread, uin
             }
             break;
           }
+          case IR::OP_INLINEENTRYPOINTOFFSET:
           case IR::OP_ENTRYPOINTOFFSET: {
             auto Op = IROp->C<IR::IROp_EntrypointOffset>();
             GD = Entry + Op->Offset;
             break;
           }
+          case IR::OP_INLINECONSTANT:
           case IR::OP_CONSTANT: {
             auto Op = IROp->C<IR::IROp_Constant>();
             GD = Op->Constant;
@@ -1592,7 +1594,35 @@ void InterpreterOps::InterpretIR(FEXCore::Core::InternalThreadState *Thread, uin
               }
             }
             memset(GDP, 0, 16);
-            memcpy(GDP, Data, Op->Size);
+            if (false && IROp->Op == IR::OP_LOADMEMTSO && OpSize != 16) {
+              switch (OpSize) {
+                case 1: {
+                  const std::atomic<uint8_t> *Dest = reinterpret_cast<const std::atomic<uint8_t>*>(Data);
+                  GD = Dest->load();
+                  break;
+                }
+                case 2: {
+                  const std::atomic<uint16_t> *Dest = reinterpret_cast<const std::atomic<uint16_t>*>(Data);
+                  GD = Dest->load();
+                  break;
+                }
+                case 4: {
+                  const std::atomic<uint32_t> *Dest = reinterpret_cast<const std::atomic<uint32_t>*>(Data);
+                  GD = Dest->load();
+                  break;
+                }
+                case 8: {
+                  const std::atomic<uint64_t> *Dest = reinterpret_cast<const std::atomic<uint64_t>*>(Data);
+                  GD = Dest->load();
+                  break;
+                }
+                default: LOGMAN_MSG_A("Unhandled Loadmem size"); break;
+              }
+            }
+            else {
+              memcpy(GDP, Data, Op->Size);
+            }
+
             break;
           }
           case IR::OP_VLOADMEMELEMENT: {
@@ -1619,7 +1649,38 @@ void InterpreterOps::InterpretIR(FEXCore::Core::InternalThreadState *Thread, uin
                 case MEM_OFFSET_SXTW.Val: Data += (int32_t)Offset; break;
               }
             }
-            memcpy(Data, GetSrc<void*>(SSAData, Op->Value), Op->Size);
+            if (false && IROp->Op == IR::OP_STOREMEMTSO && OpSize != 16) {
+              switch (OpSize) {
+                case 1: {
+                  std::atomic<uint8_t> *Dest = reinterpret_cast<std::atomic<uint8_t>*>(Data);
+                  uint8_t Src = *GetSrc<uint8_t*>(SSAData, Op->Value);
+                  Dest->store(Src);
+                  break;
+                }
+                case 2: {
+                  std::atomic<uint16_t> *Dest = reinterpret_cast<std::atomic<uint16_t>*>(Data);
+                  uint16_t Src = *GetSrc<uint16_t*>(SSAData, Op->Value);
+                  Dest->store(Src);
+                  break;
+                }
+                case 4: {
+                  std::atomic<uint32_t> *Dest = reinterpret_cast<std::atomic<uint32_t>*>(Data);
+                  uint32_t Src = *GetSrc<uint32_t*>(SSAData, Op->Value);
+                  Dest->store(Src);
+                  break;
+                }
+                case 8: {
+                  std::atomic<uint64_t> *Dest = reinterpret_cast<std::atomic<uint64_t>*>(Data);
+                  uint64_t Src = *GetSrc<uint64_t*>(SSAData, Op->Value);
+                  Dest->store(Src);
+                  break;
+                }
+                default: LOGMAN_MSG_A("Unhandled StoreMem size"); break;
+              }
+            }
+            else {
+              memcpy(Data, GetSrc<void*>(SSAData, Op->Value), Op->Size);
+            }
             break;
           }
           case IR::OP_VSTOREMEMELEMENT: {

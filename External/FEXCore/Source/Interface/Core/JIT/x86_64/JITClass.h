@@ -79,6 +79,7 @@ public:
   void CopyNecessaryDataForCompileThread(CPUBackend *Original) override;
 
 private:
+  std::vector<FEXCore::IR::IRListView> ListViewCopies{};
   Label* PendingTargetLabel{};
   FEXCore::Context::Context *CTX;
   FEXCore::Core::InternalThreadState *ThreadState;

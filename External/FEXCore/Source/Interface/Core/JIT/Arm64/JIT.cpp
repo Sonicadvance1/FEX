@@ -16,6 +16,7 @@ $end_info$
 #include "Interface/Core/ArchHelpers/MContext.h"
 #include "Interface/Core/Dispatcher/Arm64Dispatcher.h"
 #include "Interface/Core/JIT/Arm64/JITClass.h"
+#include "Interface/Core/Interpreter/InterpreterCore.h"
 #include "Interface/Core/InternalThreadState.h"
 
 #include "Interface/IR/Passes/RegisterAllocationPass.h"
@@ -479,6 +480,9 @@ Arm64JITCore::Arm64JITCore(FEXCore::Context::Context *ctx, FEXCore::Core::Intern
   : Arm64Emitter(0)
   , CTX {ctx}
   , ThreadState {Thread} {
+
+  Thread->InterpreterBackend = FEXCore::CPU::CreateInterpreterCore(ctx, Thread, true);
+
   {
     DispatcherConfig config;
     config.ExitFunctionLink = reinterpret_cast<uintptr_t>(&ExitFunctionLink);
@@ -784,6 +788,20 @@ void *Arm64JITCore::CompileCode(uint64_t Entry, [[maybe_unused]] FEXCore::IR::IR
 
   auto Buffer = GetBuffer();
   auto GuestEntry = Buffer->GetOffsetAddress<uint64_t>(GetCursorOffset());
+
+  auto Header = IR->GetHeader();
+  if (Header->Interpret) {
+    // This makes it safe on cache clear
+    LoadConstant(x0, ThreadSharedData.Dispatcher->InterpreterJump);
+    br(x0);
+
+    FinalizeCode();
+
+    auto CodeEnd = Buffer->GetOffsetAddress<uint64_t>(GetCursorOffset());
+    CPU.EnsureIAndDCacheCoherency(reinterpret_cast<void*>(GuestEntry), CodeEnd - reinterpret_cast<uint64_t>(GuestEntry));
+
+    return reinterpret_cast<void*>(GuestEntry);
+  }
 
  if (CTX->GetGdbServerStatus()) {
     aarch64::Label RunBlock;

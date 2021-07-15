@@ -36,6 +36,8 @@ public:
   uint64_t SignalHandlerReturnAddress{};
   uint64_t PauseReturnInstruction{};
 
+  uint64_t InterpreterJump{};
+
   /**  @} */
 
   uint32_t SignalHandlerRefCounter{};

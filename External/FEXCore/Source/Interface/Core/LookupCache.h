@@ -97,6 +97,7 @@ public:
   }
 
   void ClearCache();
+  void ClearL1Cache();
   void ClearL2Cache();
 
   void HintUsedRange(uint64_t Address, uint64_t Size);

@@ -439,18 +439,44 @@ DEF_OP(SpillRegister) {
   if (Op->Class == FEXCore::IR::GPRClass) {
     switch (OpSize) {
     case 1: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
       strb(GetReg<RA_64>(Op->Header.Args[0].ID()), MemOperand(sp, SlotOffset));
       break;
     }
     case 2: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
+
       strh(GetReg<RA_64>(Op->Header.Args[0].ID()), MemOperand(sp, SlotOffset));
       break;
     }
     case 4: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
+
       str(GetReg<RA_32>(Op->Header.Args[0].ID()), MemOperand(sp, SlotOffset));
       break;
     }
     case 8: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
       str(GetReg<RA_64>(Op->Header.Args[0].ID()), MemOperand(sp, SlotOffset));
       break;
     }
@@ -459,14 +485,31 @@ DEF_OP(SpillRegister) {
   } else if (Op->Class == FEXCore::IR::FPRClass) {
     switch (OpSize) {
     case 4: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
       str(GetSrc(Op->Header.Args[0].ID()).S(), MemOperand(sp, SlotOffset));
       break;
     }
     case 8: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
+
       str(GetSrc(Op->Header.Args[0].ID()).D(), MemOperand(sp, SlotOffset));
       break;
     }
     case 16: {
+      size_t MaxRange = (1U << 12) * OpSize - OpSize;
+      if (SlotOffset > MaxRange) {
+        LogMan::Msg::D("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+        LogMan::Msg::A("Slot Offset couldn't fit in to range %d > %d", SlotOffset, MaxRange);
+      }
       str(GetSrc(Op->Header.Args[0].ID()), MemOperand(sp, SlotOffset));
       break;
     }

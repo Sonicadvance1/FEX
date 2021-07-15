@@ -3,6 +3,7 @@
 #include "Interface/Core/Frontend.h"
 #include "Interface/Context/Context.h"
 
+#include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/CoreState.h>
 #include <FEXCore/Debug/X86Tables.h>
 #include <FEXCore/IR/IntrusiveIRList.h>
@@ -483,9 +484,11 @@ public:
   void SetMultiblock(bool _Multiblock) { Multiblock = _Multiblock; }
 
   bool HandledLock = false;
-private:
-  bool DecodeFailure{false};
+
   FEXCore::IR::IROp_IRHeader *Current_Header{};
+private:
+  FEX_CONFIG_OPT(NeedsInterpFallback, DOINTERPFALLBACKS);
+  bool DecodeFailure{false};
   OrderedNode *Current_HeaderNode{};
 
   OrderedNode *AppendSegmentOffset(OrderedNode *Value, uint32_t Flags, uint32_t DefaultPrefix = 0, bool Override = false);

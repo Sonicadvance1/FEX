@@ -1177,6 +1177,8 @@ void OpDispatchBuilder::LoopOp(OpcodeArgs) {
       _ExitFunction(RIPTargetConst);
     }
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::JUMPOp(OpcodeArgs) {
@@ -1757,6 +1759,8 @@ void OpDispatchBuilder::SHLDOp(OpcodeArgs) {
   SetJumpTarget(Jump, NextJumpTarget);
   SetTrueJumpTarget(CondJump, NextJumpTarget);
   SetCurrentCodeBlock(NextJumpTarget);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 
@@ -1836,6 +1840,8 @@ void OpDispatchBuilder::SHRDOp(OpcodeArgs) {
   auto JumpTarget = CreateNewCodeBlockAfter(GetCurrentBlock());
   SetFalseJumpTarget(CondJump, JumpTarget);
   SetCurrentCodeBlock(JumpTarget);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 
   if (Size != 64)
     Res = _Bfe(Size, 0, Res);
@@ -1847,6 +1853,8 @@ void OpDispatchBuilder::SHRDOp(OpcodeArgs) {
   SetJumpTarget(Jump, NextJumpTarget);
   SetTrueJumpTarget(CondJump, NextJumpTarget);
   SetCurrentCodeBlock(NextJumpTarget);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::SHRDImmediateOp(OpcodeArgs) {
@@ -3218,6 +3226,8 @@ void OpDispatchBuilder::STOSOp(OpcodeArgs) {
 
     SetCurrentCodeBlock(LoopEnd);
   }
+  // // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::MOVSOp(OpcodeArgs) {
@@ -3315,6 +3325,8 @@ void OpDispatchBuilder::MOVSOp(OpcodeArgs) {
     _StoreContext(GPRClass, GPRSize, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RSI]), RSI);
     _StoreContext(GPRClass, GPRSize, offsetof(FEXCore::Core::CPUState, gregs[FEXCore::X86State::REG_RDI]), RDI);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::CMPSOp(OpcodeArgs) {
@@ -3434,6 +3446,8 @@ void OpDispatchBuilder::CMPSOp(OpcodeArgs) {
 
     SetCurrentCodeBlock(LoopEnd);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::LODSOp(OpcodeArgs) {
@@ -3536,6 +3550,8 @@ void OpDispatchBuilder::LODSOp(OpcodeArgs) {
     SetTrueJumpTarget(CondJump, LoopEnd);
     SetCurrentCodeBlock(LoopEnd);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::SCASOp(OpcodeArgs) {
@@ -3646,6 +3662,8 @@ void OpDispatchBuilder::SCASOp(OpcodeArgs) {
 
     SetCurrentCodeBlock(LoopEnd);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::BSWAPOp(OpcodeArgs) {
@@ -4584,6 +4602,7 @@ void OpDispatchBuilder::CMPXCHGPairOp(OpcodeArgs) {
   SetJumpTarget(Jump, NextJumpTarget);
   SetTrueJumpTarget(CondJump, NextJumpTarget);
   SetCurrentCodeBlock(NextJumpTarget);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::CreateJumpBlocks(std::vector<FEXCore::Frontend::Decoder::DecodedBlocks> const *Blocks) {
@@ -6368,6 +6387,9 @@ void OpDispatchBuilder::MASKMOVOp(OpcodeArgs) {
       SetCurrentCodeBlock(NextJumpTarget);
     }
   }
+
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::MOVBetweenGPR_FPR(OpcodeArgs) {
@@ -6520,6 +6542,8 @@ void OpDispatchBuilder::FLD(OpcodeArgs) {
   // Write to ST[TOP]
   _StoreContextIndexed(converted, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   //_StoreContext(converted, 16, offsetof(FEXCore::Core::CPUState, mm[7][0]));
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FBLD(OpcodeArgs) {
@@ -6534,6 +6558,8 @@ void OpDispatchBuilder::FBLD(OpcodeArgs) {
   OrderedNode *data = LoadSource_WithOpSize(FPRClass, Op, Op->Src[0], 16, Op->Flags, -1);
   OrderedNode *converted = _F80BCDLoad(data);
   _StoreContextIndexed(converted, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FBSTP(OpcodeArgs) {
@@ -6547,6 +6573,8 @@ void OpDispatchBuilder::FBSTP(OpcodeArgs) {
 
 	auto top = _And(_Add(orig_top, _Constant(1)), _Constant(7));
 	SetX87Top(top);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<uint64_t Lower, uint32_t Upper>
@@ -6562,6 +6590,8 @@ void OpDispatchBuilder::FLD_Const(OpcodeArgs) {
   data = _VInsGPR(16, 8, data, high, 1);
   // Write to ST[TOP]
   _StoreContextIndexed(data, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FILD(OpcodeArgs) {
@@ -6600,6 +6630,8 @@ void OpDispatchBuilder::FILD(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(converted, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t width>
@@ -6618,6 +6650,8 @@ void OpDispatchBuilder::FST(OpcodeArgs) {
     auto top = _And(_Add(orig_top, _Constant(1)), _Constant(7));
     SetX87Top(top);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<bool Truncate>
@@ -6635,6 +6669,8 @@ void OpDispatchBuilder::FIST(OpcodeArgs) {
     auto top = _And(_Add(orig_top, _Constant(1)), _Constant(7));
     SetX87Top(top);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template <size_t width, bool Integer, OpDispatchBuilder::OpResult ResInST0>
@@ -6680,6 +6716,8 @@ void OpDispatchBuilder::FADD(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, StackLocation, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t width, bool Integer, OpDispatchBuilder::OpResult ResInST0>
@@ -6727,6 +6765,8 @@ void OpDispatchBuilder::FMUL(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, StackLocation, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t width, bool Integer, bool reverse, OpDispatchBuilder::OpResult ResInST0>
@@ -6780,6 +6820,8 @@ void OpDispatchBuilder::FDIV(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, StackLocation, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t width, bool Integer, bool reverse, OpDispatchBuilder::OpResult ResInST0>
@@ -6831,6 +6873,8 @@ void OpDispatchBuilder::FSUB(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, StackLocation, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FCHS(OpcodeArgs) {
@@ -6847,6 +6891,8 @@ void OpDispatchBuilder::FCHS(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FABS(OpcodeArgs) {
@@ -6863,6 +6909,8 @@ void OpDispatchBuilder::FABS(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FTST(OpcodeArgs) {
@@ -6888,6 +6936,8 @@ void OpDispatchBuilder::FTST(OpcodeArgs) {
   SetRFLAG<FEXCore::X86State::X87FLAG_C1_LOC>(_Constant(0));
   SetRFLAG<FEXCore::X86State::X87FLAG_C2_LOC>(HostFlag_Unordered);
   SetRFLAG<FEXCore::X86State::X87FLAG_C3_LOC>(HostFlag_ZF);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FRNDINT(OpcodeArgs) {
@@ -6899,6 +6949,8 @@ void OpDispatchBuilder::FRNDINT(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FXTRACT(OpcodeArgs) {
@@ -6915,6 +6967,8 @@ void OpDispatchBuilder::FXTRACT(OpcodeArgs) {
   // Write to ST[TOP]
   _StoreContextIndexed(exp, orig_top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   _StoreContextIndexed(sig, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FNINIT(OpcodeArgs) {
@@ -6931,6 +6985,7 @@ void OpDispatchBuilder::FNINIT(OpcodeArgs) {
   SetRFLAG<FEXCore::X86State::X87FLAG_C1_LOC>(_Constant(0));
   SetRFLAG<FEXCore::X86State::X87FLAG_C2_LOC>(_Constant(0));
   SetRFLAG<FEXCore::X86State::X87FLAG_C3_LOC>(_Constant(0));
+  // Current_Header->Interpret = NeedsInterpFallback();
 
   // XXX: Add FTW support
 }
@@ -6997,6 +7052,8 @@ void OpDispatchBuilder::FCOMI(OpcodeArgs) {
     top = _And(_Add(top, _Constant(1)), mask);
     SetX87Top(top);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FXCH(OpcodeArgs) {
@@ -7016,6 +7073,8 @@ void OpDispatchBuilder::FXCH(OpcodeArgs) {
   // Write to ST[TOP]
   _StoreContextIndexed(b, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   _StoreContextIndexed(a, arg, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FST(OpcodeArgs) {
@@ -7038,6 +7097,8 @@ void OpDispatchBuilder::FST(OpcodeArgs) {
     top = _And(_Add(top, _Constant(1)), _Constant(7));
     SetX87Top(top);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<FEXCore::IR::IROps IROp>
@@ -7052,6 +7113,8 @@ void OpDispatchBuilder::X87UnaryOp(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<FEXCore::IR::IROps IROp>
@@ -7075,6 +7138,7 @@ void OpDispatchBuilder::X87BinaryOp(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 template<bool Inc>
@@ -7104,6 +7168,8 @@ void OpDispatchBuilder::X87SinCos(OpcodeArgs) {
   // Write to ST[TOP]
   _StoreContextIndexed(sin, orig_top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   _StoreContextIndexed(cos, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FYL2X(OpcodeArgs) {
@@ -7128,6 +7194,8 @@ void OpDispatchBuilder::X87FYL2X(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87TAN(OpcodeArgs) {
@@ -7148,6 +7216,8 @@ void OpDispatchBuilder::X87TAN(OpcodeArgs) {
   // Write to ST[TOP]
   _StoreContextIndexed(result, orig_top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
   _StoreContextIndexed(data, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87ATAN(OpcodeArgs) {
@@ -7163,6 +7233,8 @@ void OpDispatchBuilder::X87ATAN(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87LDENV(OpcodeArgs) {
@@ -7190,6 +7262,8 @@ void OpDispatchBuilder::X87LDENV(OpcodeArgs) {
   SetRFLAG<FEXCore::X86State::X87FLAG_C1_LOC>(C1);
   SetRFLAG<FEXCore::X86State::X87FLAG_C2_LOC>(C2);
   SetRFLAG<FEXCore::X86State::X87FLAG_C3_LOC>(C3);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FNSTENV(OpcodeArgs) {
@@ -7271,18 +7345,23 @@ void OpDispatchBuilder::X87FNSTENV(OpcodeArgs) {
     OrderedNode *MemLocation = _Add(Mem, _Constant(Size * 6));
     _StoreMem(GPRClass, Size, MemLocation, ZeroConst, Size);
 	}
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FLDCW(OpcodeArgs) {
   OrderedNode *NewFCW = LoadSource(GPRClass, Op, Op->Src[0], Op->Flags, -1);
   _F80LoadFCW(NewFCW);
   _StoreContext(GPRClass, 2, offsetof(FEXCore::Core::CPUState, FCW), NewFCW);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FSTCW(OpcodeArgs) {
   auto FCW = _LoadContext(2, offsetof(FEXCore::Core::CPUState, FCW), GPRClass);
 
   StoreResult(GPRClass, Op, FCW, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::X87LDSW(OpcodeArgs) {
@@ -7300,6 +7379,8 @@ void OpDispatchBuilder::X87LDSW(OpcodeArgs) {
   SetRFLAG<FEXCore::X86State::X87FLAG_C1_LOC>(C1);
   SetRFLAG<FEXCore::X86State::X87FLAG_C2_LOC>(C2);
   SetRFLAG<FEXCore::X86State::X87FLAG_C3_LOC>(C3);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FNSTSW(OpcodeArgs) {
@@ -7319,6 +7400,8 @@ void OpDispatchBuilder::X87FNSTSW(OpcodeArgs) {
   FSW = _Or(FSW, _Lshl(C3, _Constant(14)));
 
   StoreResult(GPRClass, Op, FSW, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FNSAVE(OpcodeArgs) {
@@ -7425,6 +7508,8 @@ void OpDispatchBuilder::X87FNSAVE(OpcodeArgs) {
 
   // reset to default
   FNINIT(Op);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FRSTOR(OpcodeArgs) {
@@ -7485,6 +7570,8 @@ void OpDispatchBuilder::X87FRSTOR(OpcodeArgs) {
   OrderedNode *RegHigh = _LoadMem(FPRClass, 2, ST0Location, 1);
   Reg = _VInsElement(16, 2, 4, 0, Reg, RegHigh);
   _StoreContextIndexed(Reg, Top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::X87FXAM(OpcodeArgs) {
@@ -7594,6 +7681,8 @@ void OpDispatchBuilder::X87FCMOV(OpcodeArgs) {
 
   // Write to ST[TOP]
   _StoreContextIndexed(Result, top, 16, offsetof(FEXCore::Core::CPUState, mm[0][0]), 16, FPRClass);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::FXSaveOp(OpcodeArgs) {
@@ -7734,8 +7823,11 @@ void OpDispatchBuilder::FXRStoreOp(OpcodeArgs) {
     auto XMMReg = _LoadMem(FPRClass, 16, MemLocation, 16);
     _StoreContext(FPRClass, 16, offsetof(FEXCore::Core::CPUState, xmm[i]), XMMReg);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
+// XXX: Something below this point causes the high CPU load on ARM
 void OpDispatchBuilder::PAlignrOp(OpcodeArgs) {
   OrderedNode *Src1 = LoadSource(FPRClass, Op, Op->Dest, Op->Flags, -1);
   OrderedNode *Src2 = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
@@ -7751,6 +7843,8 @@ void OpDispatchBuilder::PAlignrOp(OpcodeArgs) {
     Res = _VExtr(Size, 1, Src1, Src2, Index);
   }
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -7779,6 +7873,8 @@ void OpDispatchBuilder::UCOMISxOp(OpcodeArgs) {
   flagsOpDest = Src1;
   flagsOpSrc = Src2;
   flagsOpSize = GetSrcSize(Op);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::LDMXCSR(OpcodeArgs) {
@@ -7786,6 +7882,8 @@ void OpDispatchBuilder::LDMXCSR(OpcodeArgs) {
   // We only support the rounding mode being set
   OrderedNode *RoundingMode = _Bfe(4, 3, 13, Dest);
   _SetRoundingMode(RoundingMode);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::STMXCSR(OpcodeArgs) {
@@ -7795,6 +7893,8 @@ void OpDispatchBuilder::STMXCSR(OpcodeArgs) {
   MXCSR = _Bfi(4, 3, 13, MXCSR, RoundingMode);
 
   StoreResult(GPRClass, Op, MXCSR, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -7808,6 +7908,8 @@ void OpDispatchBuilder::PACKUSOp(OpcodeArgs) {
   Res = _VSQXTUN2(Size, ElementSize, Res, Src);
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -7821,6 +7923,8 @@ void OpDispatchBuilder::PACKSSOp(OpcodeArgs) {
   Res = _VSQXTN2(Size, ElementSize, Res, Src);
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize, bool Signed>
@@ -7861,6 +7965,8 @@ void OpDispatchBuilder::PMULLOp(OpcodeArgs) {
     }
   }
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<bool ToXMM>
@@ -7876,6 +7982,8 @@ void OpDispatchBuilder::MOVQ2DQ(OpcodeArgs) {
     // This is simple, just store the result
     StoreResult(FPRClass, Op, Src, -1);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize, bool Signed>
@@ -7894,6 +8002,8 @@ void OpDispatchBuilder::PADDSOp(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize, bool Signed>
@@ -7912,6 +8022,8 @@ void OpDispatchBuilder::PSUBSOp(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -7934,7 +8046,11 @@ void OpDispatchBuilder::ADDSUBPOp(OpcodeArgs) {
     ResAdd = _VInsElement(Size, ElementSize, i, i, ResAdd, ResSub);
   }
   StoreResult(FPRClass, Op, ResAdd, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
+
+// XXX: Something below this point causes the high CPU load on ARM
 
 void OpDispatchBuilder::PMADDWD(OpcodeArgs) {
   // This is a pretty curious operation
@@ -7968,6 +8084,8 @@ void OpDispatchBuilder::PMADDWD(OpcodeArgs) {
   // [15:0 ] + [31:16], [32:47 ] + [63:48  ], [79:64] + [95:80], [111:96] + [127:112]
   auto Res = _VAddP(Size, 4, Res_L, Res_H);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::PMADDUBSW(OpcodeArgs) {
@@ -8029,6 +8147,8 @@ void OpDispatchBuilder::PMADDUBSW(OpcodeArgs) {
 
     StoreResult(FPRClass, Op, Res, -1);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<bool Signed>
@@ -8070,6 +8190,8 @@ void OpDispatchBuilder::PMULHW(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::PMULHRSW(OpcodeArgs) {
@@ -8108,12 +8230,16 @@ void OpDispatchBuilder::PMULHRSW(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::MOVBEOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(GPRClass, Op, Op->Src[0], Op->Flags, 1);
   Src = _Rev(Src);
   StoreResult(GPRClass, Op, Src, 1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -8124,6 +8250,8 @@ void OpDispatchBuilder::HADDP(OpcodeArgs) {
 
   OrderedNode *Res = _VFAddP(Size, ElementSize, Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -8154,6 +8282,8 @@ void OpDispatchBuilder::HSUBP(OpcodeArgs) {
 
   OrderedNode *Res = _VFAddP(Size, ElementSize, Swizzle_Dest, Swizzle_Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -8164,6 +8294,8 @@ void OpDispatchBuilder::PHADD(OpcodeArgs) {
 
   OrderedNode *Res = _VAddP(Size, ElementSize, Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 template<size_t ElementSize>
@@ -8190,6 +8322,8 @@ void OpDispatchBuilder::PHSUB(OpcodeArgs) {
 
   OrderedNode *Res = _VAddP(Size, ElementSize, Swizzle_Dest, Swizzle_Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
 void OpDispatchBuilder::PHADDS(OpcodeArgs) {
@@ -8224,7 +8358,10 @@ void OpDispatchBuilder::PHADDS(OpcodeArgs) {
 
     StoreResult(FPRClass, Op, Res, -1);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
+
+// XXX: Something below this point causes the high CPU load on ARM
 
 void OpDispatchBuilder::PHSUBS(OpcodeArgs) {
   auto Size = GetSrcSize(Op);
@@ -8278,11 +8415,13 @@ void OpDispatchBuilder::PHSUBS(OpcodeArgs) {
 
     StoreResult(FPRClass, Op, Res, -1);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 template<uint8_t FenceType>
 void OpDispatchBuilder::FenceOp(OpcodeArgs) {
   _Fence({FenceType});
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::StoreFenceOrCLFlush(OpcodeArgs) {
@@ -8296,6 +8435,7 @@ void OpDispatchBuilder::StoreFenceOrCLFlush(OpcodeArgs) {
     DestMem = AppendSegmentOffset(DestMem, Op->Flags);
     _CacheLineClear(DestMem);
   }
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::PSADBW(OpcodeArgs) {
@@ -8342,12 +8482,14 @@ void OpDispatchBuilder::PSADBW(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Result, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESImcOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
   auto Res = _VAESImc(Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESEncOp(OpcodeArgs) {
@@ -8355,6 +8497,7 @@ void OpDispatchBuilder::AESEncOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
   auto Res = _VAESEnc(Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESEncLastOp(OpcodeArgs) {
@@ -8362,6 +8505,7 @@ void OpDispatchBuilder::AESEncLastOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
   auto Res = _VAESEncLast(Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESDecOp(OpcodeArgs) {
@@ -8369,6 +8513,7 @@ void OpDispatchBuilder::AESDecOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
   auto Res = _VAESDec(Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESDecLastOp(OpcodeArgs) {
@@ -8376,6 +8521,7 @@ void OpDispatchBuilder::AESDecLastOp(OpcodeArgs) {
   OrderedNode *Src = LoadSource(FPRClass, Op, Op->Src[0], Op->Flags, -1);
   auto Res = _VAESDecLast(Dest, Src);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::AESKeyGenAssist(OpcodeArgs) {
@@ -8385,7 +8531,10 @@ void OpDispatchBuilder::AESKeyGenAssist(OpcodeArgs) {
 
   auto Res = _VAESKeyGenAssist(Src, RCON);
   StoreResult(FPRClass, Op, Res, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
+
+// XXX: Something below this point causes the high CPU load on ARM
 
 template<size_t ElementSize, size_t DstElementSize, bool Signed>
 void OpDispatchBuilder::ExtendVectorElements(OpcodeArgs) {
@@ -8406,6 +8555,8 @@ void OpDispatchBuilder::ExtendVectorElements(OpcodeArgs) {
     }
   }
   StoreResult(FPRClass, Op, Result, -1);
+
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 template<size_t ElementSize, bool Scalar>
@@ -8441,6 +8592,8 @@ void OpDispatchBuilder::VectorRound(OpcodeArgs) {
   else {
     StoreResult(FPRClass, Op, Src, -1);
   }
+
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 template<size_t ElementSize>
@@ -8457,6 +8610,8 @@ void OpDispatchBuilder::VectorBlend(OpcodeArgs) {
     }
   }
   StoreResult(FPRClass, Op, Dest, -1);
+
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 template<size_t ElementSize>
@@ -8477,7 +8632,11 @@ void OpDispatchBuilder::VectorVariableBlend(OpcodeArgs) {
   auto Result = _VBSL(Mask, Src, Dest);
 
   StoreResult(FPRClass, Op, Result, -1);
+
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
+
+// XXX: Something below this point causes the high CPU load on ARM
 
 void OpDispatchBuilder::PTestOp(OpcodeArgs) {
   auto Size = GetSrcSize(Op);
@@ -8510,6 +8669,7 @@ void OpDispatchBuilder::PTestOp(OpcodeArgs) {
 
   SetRFLAG<FEXCore::X86State::RFLAG_ZF_LOC>(Test1);
   SetRFLAG<FEXCore::X86State::RFLAG_CF_LOC>(Test2);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::PHMINPOSUWOp(OpcodeArgs) {
@@ -8548,7 +8708,11 @@ void OpDispatchBuilder::PHMINPOSUWOp(OpcodeArgs) {
   Result = _VInsGPR(16, 2, Result, Pos, 1);
 
   StoreResult(FPRClass, Op, Result, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
+
+// XXX: Something below this point causes the high CPU load on ARM
 
 template<size_t ElementSize>
 void OpDispatchBuilder::DPPOp(OpcodeArgs) {
@@ -8592,8 +8756,11 @@ void OpDispatchBuilder::DPPOp(OpcodeArgs) {
   }
 
   StoreResult(FPRClass, Op, Result, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
+
 }
 
+// XXX: Something below this point causes the high CPU load on ARM
 void OpDispatchBuilder::MPSADBWOp(OpcodeArgs) {
   LOGMAN_THROW_A(Op->Src[1].IsLiteral(), "Src1 needs to be literal here");
   uint8_t Select = Op->Src[1].Data.Literal.Value;
@@ -8679,6 +8846,7 @@ void OpDispatchBuilder::MPSADBWOp(OpcodeArgs) {
   auto Result = _VInsElement(16, 8, 1, 0, Even, Odd);
 
   StoreResult(FPRClass, Op, Result, -1);
+  // Current_Header->Interpret = NeedsInterpFallback();
 }
 
 void OpDispatchBuilder::UnimplementedOp(OpcodeArgs) {

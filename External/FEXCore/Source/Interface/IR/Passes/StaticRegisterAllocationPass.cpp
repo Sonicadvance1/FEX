@@ -13,6 +13,7 @@ namespace FEXCore::IR {
 class StaticRegisterAllocationPass final : public FEXCore::IR::Pass {
 public:
   bool Run(IREmitter *IREmit) override;
+  FEX_CONFIG_OPT(Core, CORE);
 };
 
 bool IsStaticAllocGpr(uint32_t Offset, RegisterClassType Class) {
@@ -50,6 +51,16 @@ bool IsStaticAllocFpr(uint32_t Offset, RegisterClassType Class, bool AllowGpr) {
  */
 bool StaticRegisterAllocationPass::Run(IREmitter *IREmit) {
   auto CurrentIR = IREmit->ViewIR();
+
+  auto Header = CurrentIR.GetHeader();
+
+  if (Core == FEXCore::Config::CONFIG_INTERPRETER) {
+    return false;
+  }
+
+  if (Header->Interpret) {
+    return false;
+  }
 
   for (auto [BlockNode, BlockIROp] : CurrentIR.GetBlocks()) {
       for (auto [CodeNode, IROp] : CurrentIR.GetCode(BlockNode)) {
