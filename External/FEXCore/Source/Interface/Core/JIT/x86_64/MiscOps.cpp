@@ -106,9 +106,20 @@ DEF_OP(GetRoundingMode) {
   sub(rsp, 4);
   // Only stores to memory
   stmxcsr(dword [rsp]);
-  mov(Dst, dword [rsp]);
+  mov(TMP1, dword [rsp]);
   add(rsp, 4);
-  shr(Dst, 13);
+
+  // Extract the Exception mask
+  mov(Dst, TMP1);
+  and_(Dst, 0b1111111 << 6);
+  // Shift the exception mask to offset 3
+  shr(Dst, 3);
+
+  // Extract the rounding modes
+  shr(TMP1, 13);
+
+  // Insert rounding mode in to destination
+  or_(Dst, TMP1);
 }
 
 DEF_OP(SetRoundingMode) {
@@ -121,10 +132,22 @@ DEF_OP(SetRoundingMode) {
   stmxcsr(dword [rsp]);
   mov(TMP1.cvt32(), dword [rsp]);
 
+  // Clear rounding and exception mask
+  and_(TMP1.cvt32(), ~(0b1'11'1111111 << 6));
+
   // Insert the new rounding mode
-  and_(TMP1.cvt32(), ~(0b111 << 13));
   mov(TMP2.cvt32(), Src);
+  and_(TMP2.cvt32(), 0b111);
+
   shl(TMP2.cvt32(), 13);
+  or_(TMP1.cvt32(), TMP2.cvt32());
+
+  // Insert the new exception mask
+  mov(TMP2.cvt32(), Src);
+  and_(TMP2.cvt32(), (0b1111111 << 3));
+
+  // Shift left by three align to the correct location
+  shl(TMP2.cvt32(), 3);
   or_(TMP1.cvt32(), TMP2.cvt32());
 
   // Store it to mxcsr

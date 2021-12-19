@@ -27,6 +27,7 @@ namespace FEXCore::Core {
     } gdt[32];
     uint16_t FCW;
     uint16_t FTW;
+    uint32_t MXCSR;
   };
   static_assert(offsetof(CPUState, xmm) % 16 == 0, "xmm needs to be 128bit aligned!");
 

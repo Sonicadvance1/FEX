@@ -1458,16 +1458,41 @@ void OpDispatchBuilder::UCOMISxOp<8>(OpcodeArgs);
 
 void OpDispatchBuilder::LDMXCSR(OpcodeArgs) {
   OrderedNode *Dest = LoadSource(GPRClass, Op, Op->Dest, Op->Flags, -1);
+  // Store the raw MXCSR to the context
+  _StoreContext(GPRClass, 4, offsetof(FEXCore::Core::CPUState, MXCSR), Dest);
+
   // We only support the rounding mode being set
   OrderedNode *RoundingMode = _Bfe(4, 3, 13, Dest);
+  // Extract the Exception masks
+  // These are in bits [12,6]
+  auto ExceptionMasks = _Bfe(4, 7, 6, Dest);
+
+  // Insert the exception masks at offset 3
+  // bitfield layout matches
+  RoundingMode = _Bfi(4, 7, 3, RoundingMode, ExceptionMasks);
   _SetRoundingMode(RoundingMode);
+
 }
 
 void OpDispatchBuilder::STMXCSR(OpcodeArgs) {
   // Default MXCSR
-  OrderedNode *MXCSR = _Constant(32, 0x1F80);
+  OrderedNode *MXCSR = _Constant(0);
   OrderedNode *RoundingMode = _GetRoundingMode();
+
+  // Extract the rounding mode
   MXCSR = _Bfi(4, 3, 13, MXCSR, RoundingMode);
+
+  // Extract the exception masks
+  auto ExceptionMasks = _Bfe(4, 7, 3, RoundingMode);
+
+  // Insert the exception mask in to the correct location of the MXCSR
+  MXCSR = _Bfi(4, 7, 6, MXCSR, ExceptionMasks);
+
+  // Load our raw MXCSR and insert some data
+  auto RawMXCSR = _LoadContext(4, offsetof(FEXCore::Core::CPUState, MXCSR), GPRClass);
+
+  // Only insert the lower 6 bits
+  MXCSR = _Bfi(4, 6, 0, MXCSR, RawMXCSR);
 
   StoreResult(GPRClass, Op, MXCSR, -1);
 }

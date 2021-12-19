@@ -74,7 +74,7 @@ namespace {
     std::vector<ContextMemberInfo> ClassificationInfo;
   };
 
-  constexpr static std::array<LastAccessType, 16> DefaultAccess = {
+  constexpr static std::array<LastAccessType, 17> DefaultAccess = {
     ACCESS_NONE,
     ACCESS_NONE,
     ACCESS_INVALID, // PAD
@@ -87,6 +87,7 @@ namespace {
     ACCESS_NONE,
     ACCESS_NONE,
     ACCESS_INVALID, // PAD
+    ACCESS_NONE,
     ACCESS_NONE,
     ACCESS_NONE,
     ACCESS_NONE,
@@ -253,6 +254,15 @@ namespace {
       FEXCore::IR::InvalidClass,
     });
 
+    // MXCSR
+    ContextClassification->emplace_back(ContextMemberInfo {
+      ContextMemberClassification {
+        offsetof(FEXCore::Core::CPUState, MXCSR),
+        sizeof(FEXCore::Core::CPUState::MXCSR),
+      },
+      DefaultAccess[16],
+      FEXCore::IR::InvalidClass,
+    });
 
     size_t ClassifiedStructSize{};
     ContextClassificationInfo->Lookup.reserve(sizeof(FEXCore::Core::CPUState));
@@ -317,6 +327,7 @@ namespace {
 
     SetAccess(Offset++, DefaultAccess[14]);
     SetAccess(Offset++, DefaultAccess[15]);
+    SetAccess(Offset++, DefaultAccess[16]);
   }
 
   struct BlockInfo {

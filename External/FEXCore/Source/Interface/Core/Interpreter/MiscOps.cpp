@@ -60,6 +60,7 @@ DEF_OP(GetRoundingMode) {
     mrs %[Tmp], FPCR;
   )"
   : [Tmp] "=r" (Tmp));
+  LogMan::Msg::D("GetRoundingMode: FPCR: 0x%08x", Tmp);
   // Extract the rounding
   // On ARM the ordering is different than on x86
   GuestRounding |= ((Tmp >> 24) & 1) ? IR::ROUND_MODE_FLUSH_TO_ZERO : 0;
@@ -72,18 +73,75 @@ DEF_OP(GetRoundingMode) {
     GuestRounding |= IR::ROUND_MODE_NEGATIVE_INFINITY;
   else if (RoundingMode == 3)
     GuestRounding |= IR::ROUND_MODE_TOWARDS_ZERO;
+
+  // Extract the ExceptionMask from the FPCR
+  // Remember that x86 uses a mask, AArch64 uses enable, so it needs to be inverted
+  // Mapping
+  // Reiterated from IR.json for clarity
+  //   [3]: DAZ - Denormals Are Zero",
+  //        x86:     MXCSR[6]",
+  //        AArch64: FPCR[0] (Only when AFP is supported)",
+  //   Masks are set to mask the exception",
+  //   AArch64 needs to invert these",
+  //   [4]: Invalid Operation Exception Mask",
+  //        x86:     MXCSR[7]",
+  //        AArch64: FPCR[8]",
+  //   [5]: Denormalized Operands Exception Mask",
+  //        x86:     MXCSR[8]",
+  //        AArch64: FPCR[15]",
+  //   [6]: Zero-Divide Exception Mask",
+  //        x86:     MXCSR[9]",
+  //        AArch64: FPCR[9]",
+  //   [7]: Overflow Exception Mask",
+  //        x86:     MXCSR[10]",
+  //        AArch64: FPCR[10]",
+  //   [8]: Underflow Exception Mask",
+  //        x86:     MXCSR[11]",
+  //        AArch64: FPCR[11]",
+  //   [9]: Precision Exception Mask",
+  //        x86:     MXCSR[12]",
+  //        AArch64: FPCR[12]",
+
+
+  uint32_t HostExceptionMask = ~Tmp;
+
+  // DAZ
+  GuestRounding |= ((HostExceptionMask >> 0) & 1) << 3;
+
+  // IOE
+  GuestRounding |= ((HostExceptionMask >> 8) & 1) << 4;
+
+  // DZE
+  GuestRounding |= ((HostExceptionMask >> 9) & 1) << 6;
+
+  // OFE
+  GuestRounding |= ((HostExceptionMask >> 10) & 1) << 7;
+
+  // UFE
+  GuestRounding |= ((HostExceptionMask >> 11) & 1) << 8;
+
+  // IXE
+  GuestRounding |= ((HostExceptionMask >> 12) & 1) << 9;
+
+  // IDE
+  GuestRounding |= ((HostExceptionMask >> 15) & 1) << 5;
+
+  LogMan::Msg::D("Guest Rounding is 0x%x", GuestRounding);
 #else
-  GuestRounding = _mm_getcsr();
+  uint32_t HostRounding = _mm_getcsr();
 
   // Extract the rounding
-  GuestRounding = (GuestRounding >> 13) & 0b111;
+  GuestRounding = (HostRounding >> 13) & 0b111;
+
+  // Extract the exception mask
+  GuestRounding |= ((HostRounding >> 6) & 0b1111111) << 3;
 #endif
   memcpy(GDP, &GuestRounding, sizeof(GuestRounding));
 }
 
 DEF_OP(SetRoundingMode) {
   auto Op = IROp->C<IR::IROp_SetRoundingMode>();
-  uint8_t GuestRounding = *GetSrc<uint8_t*>(Data->SSAData, Op->Header.Args[0]);
+  uint32_t GuestRounding = *GetSrc<uint32_t*>(Data->SSAData, Op->Header.Args[0]);
 #ifdef _M_ARM_64
   uint64_t HostRounding{};
   __asm volatile(R"(
@@ -93,8 +151,22 @@ DEF_OP(SetRoundingMode) {
   // Mask out the rounding
   HostRounding &= ~(0b111 << 22);
 
+  // Mask out exception mask
+  constexpr uint32_t AArch64ExceptionMask =
+    (1U << 0) |  // FIZ - Flush Inputs to Zero
+    (1U << 8) |  // IOE - Invalid Operation Exception enable
+    (1U << 9) |  // DZE - Divide by Zero exception enable
+    (1U << 10) | // OFE - Overflow exception enable
+    (1U << 11) | // UFE - Underflow exception enable
+    (1U << 12) | // IXE - Inexact exception enable
+    (1U << 15);  // IDE - Input denormal exception enable
+
+  HostRounding &= ~(AArch64ExceptionMask);
+
+  // Insert flush to zero
   HostRounding |= (GuestRounding & IR::ROUND_MODE_FLUSH_TO_ZERO) ? (1U << 24) : 0;
 
+  // Insert the rounding mode
   uint8_t RoundingMode = GuestRounding & 0b11;
   if (RoundingMode == IR::ROUND_MODE_NEAREST)
     HostRounding |= (0b00U << 22);
@@ -105,18 +177,81 @@ DEF_OP(SetRoundingMode) {
   else if (RoundingMode == IR::ROUND_MODE_TOWARDS_ZERO)
     HostRounding |= (0b11U << 22);
 
+  // Insert the exception mask
+  // The one provided is a mask, where AArch64 is a trap enable bit
+  // This means we need to invert the incoming modes
+  uint32_t GuestExceptionMask = ~((GuestRounding >> 3) & 0b1111111);
+
+  // Mapping
+  // Reiterated from IR.json for clarity
+  //   [3]: DAZ - Denormals Are Zero",
+  //        x86:     MXCSR[6]",
+  //        AArch64: FPCR[0] (Only when AFP is supported)",
+  //   Masks are set to mask the exception",
+  //   AArch64 needs to invert these",
+  //   [4]: Invalid Operation Exception Mask",
+  //        x86:     MXCSR[7]",
+  //        AArch64: FPCR[8]",
+  //   [5]: Denormalized Operands Exception Mask",
+  //        x86:     MXCSR[8]",
+  //        AArch64: FPCR[15]",
+  //   [6]: Zero-Divide Exception Mask",
+  //        x86:     MXCSR[9]",
+  //        AArch64: FPCR[9]",
+  //   [7]: Overflow Exception Mask",
+  //        x86:     MXCSR[10]",
+  //        AArch64: FPCR[10]",
+  //   [8]: Underflow Exception Mask",
+  //        x86:     MXCSR[11]",
+  //        AArch64: FPCR[11]",
+  //   [9]: Precision Exception Mask",
+  //        x86:     MXCSR[12]",
+  //        AArch64: FPCR[12]",
+
+  // Now that we've inverted the mask we just need to insert
+  // DAZ
+  HostRounding |= ((GuestExceptionMask >> 0) & 1) << 0;
+
+  // IOE
+  HostRounding |= ((GuestExceptionMask >> 1) & 1) << 8;
+
+  // DZE
+  HostRounding |= ((GuestExceptionMask >> 3) & 1) << 9;
+
+  // OFE
+  HostRounding |= ((GuestExceptionMask >> 4) & 1) << 10;
+
+  // UFE
+  HostRounding |= ((GuestExceptionMask >> 5) & 1) << 11;
+
+  // IXE
+  HostRounding |= ((GuestExceptionMask >> 6) & 1) << 12;
+
+  // IDE
+  HostRounding |= ((GuestExceptionMask >> 2) & 1) << 15;
+  LogMan::Msg::D("Setting Host FPCR to 0x%08x", HostRounding);
+
   __asm volatile(R"(
     msr FPCR, %[Tmp];
   )"
   :: [Tmp] "r" (HostRounding));
+
+
+  __asm volatile(R"(
+    mrs %[Tmp], FPCR;
+  )"
+  : [Tmp] "=r" (HostRounding));
+  LogMan::Msg::D("\tAfter set it became 0x%08x", HostRounding);
 #else
-  uint32_t HostRounding = _mm_getcsr();
-
-  // Cut out the host rounding mode
-  HostRounding &= ~(0b111 << 13);
-
+  uint32_t HostRounding{};
   // Insert our new rounding mode
-  HostRounding |= GuestRounding << 13;
+  HostRounding |= (GuestRounding & 0b111) << 13;
+
+  // Insert the new exception mask
+  HostRounding |= ((GuestRounding >> 3) & 0b1111111) << 6;
+
+  // This implicitly clears the host's exception flags
+
   _mm_setcsr(HostRounding);
 #endif
 }
