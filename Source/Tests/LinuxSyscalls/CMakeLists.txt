@@ -1,6 +1,6 @@
 add_compile_options(-fno-operator-names)
 
-add_library(LinuxEmulation STATIC
+set (SRCS
     EmulatedFiles/EmulatedFiles.cpp
     FileManagement.cpp
     LinuxAllocator.cpp
@@ -60,8 +60,27 @@ add_library(LinuxEmulation STATIC
     Syscalls/Time.cpp
     Syscalls/Timer.cpp
     Syscalls/NotImplemented.cpp
-    Syscalls/Stubs.cpp
-)
+    Syscalls/Stubs.cpp)
+
+if (ANDROID_BUILD)
+  list(APPEND SRCS
+    Syscalls/AndroidHandlers/FS.cpp
+    Syscalls/AndroidHandlers/Msg.cpp
+    Syscalls/AndroidHandlers/Info.cpp
+    Syscalls/AndroidHandlers/Key.cpp
+    Syscalls/AndroidHandlers/Semaphore.cpp
+    Syscalls/AndroidHandlers/Time.cpp
+    Syscalls/AndroidHandlers/x32/FS.cpp
+    Syscalls/AndroidHandlers/x32/Msg.cpp
+    Syscalls/AndroidHandlers/x32/Semaphore.cpp
+    Syscalls/AndroidHandlers/x32/Thread.cpp
+    Syscalls/AndroidHandlers/x64/Msg.cpp
+    Syscalls/AndroidHandlers/x64/Semaphore.cpp
+    Syscalls/AndroidHandlers/x64/Thread.cpp
+    )
+endif()
+
+add_library(LinuxEmulation STATIC ${SRCS})
 
 target_compile_options(LinuxEmulation
 PRIVATE
