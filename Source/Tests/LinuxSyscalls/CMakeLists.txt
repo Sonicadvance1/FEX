@@ -64,19 +64,19 @@ set (SRCS
 
 if (ANDROID_BUILD)
   list(APPEND SRCS
-    Syscalls/AndroidHandlers/FS.cpp
-    Syscalls/AndroidHandlers/Msg.cpp
-    Syscalls/AndroidHandlers/Info.cpp
-    Syscalls/AndroidHandlers/Key.cpp
-    Syscalls/AndroidHandlers/Semaphore.cpp
-    Syscalls/AndroidHandlers/Time.cpp
-    Syscalls/AndroidHandlers/x32/FS.cpp
-    Syscalls/AndroidHandlers/x32/Msg.cpp
-    Syscalls/AndroidHandlers/x32/Semaphore.cpp
-    Syscalls/AndroidHandlers/x32/Thread.cpp
-    Syscalls/AndroidHandlers/x64/Msg.cpp
-    Syscalls/AndroidHandlers/x64/Semaphore.cpp
-    Syscalls/AndroidHandlers/x64/Thread.cpp
+    AndroidHandlers/FS.cpp
+    AndroidHandlers/Msg.cpp
+    AndroidHandlers/Info.cpp
+    AndroidHandlers/Key.cpp
+    AndroidHandlers/Semaphore.cpp
+    AndroidHandlers/Time.cpp
+    AndroidHandlers/x32/FS.cpp
+    AndroidHandlers/x32/Msg.cpp
+    AndroidHandlers/x32/Semaphore.cpp
+    AndroidHandlers/x32/Thread.cpp
+    AndroidHandlers/x64/Msg.cpp
+    AndroidHandlers/x64/Semaphore.cpp
+    AndroidHandlers/x64/Thread.cpp
     )
 endif()
 
