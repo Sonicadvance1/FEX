@@ -314,7 +314,7 @@ void SyscallHandler::TrackShmat(int shmid, uintptr_t Base, int shmflg) {
 
   shmid_ds stat;
 
-  auto res = shmctl(shmid, IPC_STAT, &stat);
+  auto res = ::syscall(SYSCALL_DEF(_shmctl), shmid, IPC_STAT, &stat);
   LOGMAN_THROW_A_FMT(res != -1, "shmctl IPC_STAT failed");
 
   uint64_t Length = stat.shm_segsz;

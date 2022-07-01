@@ -117,9 +117,9 @@ namespace FEX::HLE::x64 {
       SYSCALL_ERRNO();
     });
 
-    REGISTER_SYSCALL_IMPL_X64_FLAGS(shmat, SyscallFlags::OPTIMIZETHROUGH | SyscallFlags::NOSYNCSTATEONENTRY,
+    REGISTER_SYSCALL_IMPL_X64_FLAGS(_shmat, SyscallFlags::OPTIMIZETHROUGH | SyscallFlags::NOSYNCSTATEONENTRY,
       [](FEXCore::Core::CpuStateFrame *Frame, int shmid, const void *shmaddr, int shmflg) -> uint64_t {
-      uint64_t Result = reinterpret_cast<uint64_t>(shmat(shmid, shmaddr, shmflg));
+      uint64_t Result = static_cast<uint64_t>(::syscall(SYSCALL_DEF(_shmat), shmid, shmaddr, shmflg));
 
       if (Result != -1) {
         FEX::HLE::_SyscallHandler->TrackShmat(shmid, Result, shmflg);
@@ -127,9 +127,9 @@ namespace FEX::HLE::x64 {
       SYSCALL_ERRNO();
     });
 
-    REGISTER_SYSCALL_IMPL_X64_FLAGS(shmdt, SyscallFlags::OPTIMIZETHROUGH | SyscallFlags::NOSYNCSTATEONENTRY,
+    REGISTER_SYSCALL_IMPL_X64_FLAGS(_shmdt, SyscallFlags::OPTIMIZETHROUGH | SyscallFlags::NOSYNCSTATEONENTRY,
       [](FEXCore::Core::CpuStateFrame *Frame, const void *shmaddr) -> uint64_t {
-      uint64_t Result = ::shmdt(shmaddr);
+      uint64_t Result = ::syscall(SYSCALL_DEF(_shmdt), shmaddr);
 
       if (Result != -1) {
         FEX::HLE::_SyscallHandler->TrackShmdt((uintptr_t)shmaddr);

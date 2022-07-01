@@ -20,6 +20,7 @@ ARG_TO_STR(FEX::HLE::x32::compat_ptr<FEX::HLE::x32::sigevent32>, "%lx")
 
 namespace FEX::HLE::Android::x32 {
   void RegisterMsg() {
+using namespace FEX::HLE::x32;
     REGISTER_SYSCALL_IMPL_X32(mq_timedsend, [](FEXCore::Core::CpuStateFrame *Frame, FEX::HLE::mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned int msg_prio, const struct timespec32 *abs_timeout) -> uint64_t {
       return -ENOSYS;
     });

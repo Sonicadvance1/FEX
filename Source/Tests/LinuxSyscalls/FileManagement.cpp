@@ -478,12 +478,12 @@ uint64_t FileManager::FAccessat2(int dirfd, const char *pathname, int mode, int 
 
   auto Path = GetEmulatedPath(SelfPath, (flags & AT_SYMLINK_NOFOLLOW) == 0);
   if (!Path.empty()) {
-    uint64_t Result = ::syscall(SYSCALL_DEF(faccessat2), dirfd, Path.c_str(), mode, flags);
+    uint64_t Result = faccessat(dirfd, Path.c_str(), mode, flags);
     if (Result != -1)
       return Result;
   }
 
-  return ::syscall(SYSCALL_DEF(faccessat2), dirfd, SelfPath, mode, flags);
+  return ::faccessat(dirfd, SelfPath, mode, flags);
 }
 
 uint64_t FileManager::Readlink(const char *pathname, char *buf, size_t bufsiz) {

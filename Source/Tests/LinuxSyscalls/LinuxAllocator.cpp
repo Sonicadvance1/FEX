@@ -47,8 +47,8 @@ public:
   void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset) override;
   int munmap(void *addr, size_t length) override;
   void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address) override;
-  uint64_t shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) override;
-  uint64_t shmdt(const void* shmaddr) override;
+  uint64_t Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) override;
+  uint64_t Shmdt(const void* shmaddr) override;
   static constexpr bool SearchDown = true;
 
   // PageAddr is a page already shifted to page index
@@ -435,12 +435,12 @@ void *MemAllocator32Bit::mremap(void *old_address, size_t old_size, size_t new_s
   return reinterpret_cast<void*>(-errno);
 }
 
-uint64_t MemAllocator32Bit::shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) {
+uint64_t MemAllocator32Bit::Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) {
   std::scoped_lock<std::mutex> lk{AllocMutex};
 
   if (shmaddr != nullptr) {
     // shmaddr must be valid
-    uint64_t Result = reinterpret_cast<uint64_t>(::shmat(shmid, shmaddr, shmflg));
+    uint64_t Result = static_cast<uint64_t>(::syscall(SYSCALL_DEF(_shmat), shmid, shmaddr, shmflg));
     if (Result != -1) {
       uint32_t SmallRet = Result >> 32;
       if (!(SmallRet == 0 ||
@@ -460,7 +460,7 @@ uint64_t MemAllocator32Bit::shmat(int shmid, const void* shmaddr, int shmflg, ui
       // We must get the shm size and track it
       struct shmid_ds buf{};
 
-      if (shmctl(shmid, IPC_STAT, &buf) == 0) {
+      if (::syscall(SYSCALL_DEF(_shmctl), shmid, IPC_STAT, &buf) == 0) {
         // Map the new pages
         size_t NewPagesLength = buf.shm_segsz >> FHU::FEX_PAGE_SHIFT;
         SetUsedPages(NewPageAddr, NewPagesLength);
@@ -479,7 +479,7 @@ uint64_t MemAllocator32Bit::shmat(int shmid, const void* shmaddr, int shmflg, ui
     struct shmid_ds buf{};
     uint64_t PagesLength{};
 
-    if (shmctl(shmid, IPC_STAT, &buf) == 0) {
+    if (::syscall(SYSCALL_DEF(_shmctl), shmid, IPC_STAT, &buf) == 0) {
       PagesLength = FEXCore::AlignUp(buf.shm_segsz, FHU::FEX_PAGE_SIZE) >> FHU::FEX_PAGE_SHIFT;
     }
     else {
@@ -504,7 +504,7 @@ restart:
       }
       {
         // Try and map the range
-        void *MappedPtr = ::shmat(
+        void *MappedPtr = (void*)::syscall(SYSCALL_DEF(_shmat),
           shmid,
           reinterpret_cast<const void*>(LowerPage << FHU::FEX_PAGE_SHIFT),
           shmflg);
@@ -548,7 +548,7 @@ restart:
     }
   }
 }
-uint64_t MemAllocator32Bit::shmdt(const void* shmaddr) {
+uint64_t MemAllocator32Bit::Shmdt(const void* shmaddr) {
   std::scoped_lock<std::mutex> lk{AllocMutex};
   
   uint32_t AddrPage = reinterpret_cast<uint64_t>(shmaddr) >> FHU::FEX_PAGE_SHIFT;
@@ -559,7 +559,7 @@ uint64_t MemAllocator32Bit::shmdt(const void* shmaddr) {
     return -EINVAL;
   }
 
-  uint64_t Result = ::shmdt(shmaddr);
+  uint64_t Result = ::syscall(SYSCALL_DEF(_shmdt), shmaddr);
   PageToShm.erase(it);
 
   SYSCALL_ERRNO();
@@ -588,8 +588,8 @@ public:
     return reinterpret_cast<void*>(Result);
   }
 
-  uint64_t shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) override {
-    uint64_t Result = (uint64_t)::shmat(shmid, reinterpret_cast<const void*>(shmaddr), shmflg);
+  uint64_t Shmat(int shmid, const void* shmaddr, int shmflg, uint32_t *ResultAddress) override {
+    uint64_t Result = (uint64_t)::syscall(SYSCALL_DEF(_shmat), shmid, reinterpret_cast<const void*>(shmaddr), shmflg);
     if (Result != ~0ULL) {
       *ResultAddress = Result;
       Result = 0;
@@ -597,8 +597,8 @@ public:
     SYSCALL_ERRNO();
   }
 
-  uint64_t shmdt(const void* shmaddr) override {
-    uint64_t Result = ::shmdt(shmaddr);
+  uint64_t Shmdt(const void* shmaddr) override {
+    uint64_t Result = ::syscall(SYSCALL_DEF(_shmdt), shmaddr);
     SYSCALL_ERRNO();
   }
 };
