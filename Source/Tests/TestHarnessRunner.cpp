@@ -177,8 +177,14 @@ int main(int argc, char **argv, char **const envp) {
     auto SyscallHandler = Loader.Is64BitMode() ? FEX::HLE::x64::CreateHandler(CTX, SignalDelegation.get())
                                                : FEX::HLE::x32::CreateHandler(CTX, SignalDelegation.get(), std::move(Allocator));
 
-    auto Mapper = std::bind_front(&FEX::HLE::SyscallHandler::GuestMmap, SyscallHandler.get());
-    auto Unmapper = std::bind_front(&FEX::HLE::SyscallHandler::GuestMunmap, SyscallHandler.get());
+  auto SyscallHandlerPtr = SyscallHandler.get();
+
+  auto Mapper = [SyscallHandlerPtr](void *addr, size_t length, int prot, int flags, int fd, off_t offset) -> void* {
+    return SyscallHandlerPtr->GuestMmap(addr, length, prot, flags, fd, offset);
+  };
+  auto Unmapper = [SyscallHandlerPtr](void *addr, uint64_t length) -> int {
+    return SyscallHandlerPtr->GuestMunmap(addr, length);
+  };
 
     if (!Loader.MapMemory(Mapper, Unmapper)) {
       // failed to map
