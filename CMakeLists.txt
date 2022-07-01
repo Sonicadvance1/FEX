@@ -140,6 +140,12 @@ if(DEFINED ENV{TERMUX_VERSION} OR ENABLE_TERMUX_BUILD)
   set(ENABLE_JEMALLOC FALSE)
 endif()
 
+if (CMAKE_SYSTEM_NAME MATCHES "Android")
+  # Gets set on Termux builds
+  add_definitions(-DANDROID_BUILD=1)
+  set(ANDROID_BUILD 1)
+endif()
+
 if (ENABLE_STATIC_PIE)
   if (_M_ARM_64 AND ENABLE_LLD)
     message (FATAL_ERROR "Static linking does not currently work with AArch64+lld. Use GNU ld for now.")
