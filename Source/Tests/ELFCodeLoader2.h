@@ -455,9 +455,6 @@ class ELFCodeLoader2 final : public FEXCore::CodeLoader {
 #endif
       // Align the mapping
       ELFLoadHint &= FHU::FEX_PAGE_MASK;
-    } else {
-      InterpeterElfBase = 0;
-      Entrypoint = MainElfEntrypoint;
     }
 
     // load the main elf
@@ -487,6 +484,11 @@ class ELFCodeLoader2 final : public FEXCore::CodeLoader {
 
     MainElfBase = LoadBase + MainElf.phdrs.front().p_vaddr - MainElf.phdrs.front().p_offset;
     MainElfEntrypoint = LoadBase + MainElf.ehdr.e_entry;
+
+    if (MainElf.InterpreterElf.empty()) {
+      InterpeterElfBase = 0;
+      Entrypoint = MainElfEntrypoint;
+    }
 
     // All done
 
