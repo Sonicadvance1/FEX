@@ -21,15 +21,16 @@ namespace FEXCore::Allocator {
   FEX_DEFAULT_VISIBILITY extern REALLOC_Hook realloc;
   FEX_DEFAULT_VISIBILITY extern FREE_Hook free;
 
-  FEX_DEFAULT_VISIBILITY void SetupHooks();
-  FEX_DEFAULT_VISIBILITY void ClearHooks();
-
-  FEX_DEFAULT_VISIBILITY size_t DetermineVASize();
-
   struct MemoryRegion {
     void *Ptr;
     size_t Size;
   };
+
+  FEX_DEFAULT_VISIBILITY void SetupHooks();
+  FEX_DEFAULT_VISIBILITY void SetupHooksWithSafeRegions(std::vector<MemoryRegion> *MemoryRegions);
+  FEX_DEFAULT_VISIBILITY void ClearHooks();
+
+  FEX_DEFAULT_VISIBILITY size_t DetermineVASize();
 
   FEX_DEFAULT_VISIBILITY std::vector<MemoryRegion> StealMemoryRegion(uintptr_t Begin, uintptr_t End);
   FEX_DEFAULT_VISIBILITY void ReclaimMemoryRegion(const std::vector<MemoryRegion> & Regions);

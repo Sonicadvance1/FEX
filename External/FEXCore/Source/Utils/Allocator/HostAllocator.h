@@ -1,9 +1,12 @@
 #pragma once
 
+#include <FEXCore/Utils/Allocator.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <sys/types.h>
+#include <vector>
 
 namespace Alloc {
   // HostAllocator is just a page pased slab allocator
@@ -36,4 +39,5 @@ namespace Alloc {
 
 namespace Alloc::OSAllocator {
 std::unique_ptr<Alloc::HostAllocator> Create64BitAllocator();
+std::unique_ptr<Alloc::HostAllocator> Create64BitAllocatorWithMemoryRegions(std::vector<FEXCore::Allocator::MemoryRegion> *MemoryRegions);
 }

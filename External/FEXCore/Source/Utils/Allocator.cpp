@@ -71,16 +71,27 @@ namespace FEXCore::Allocator {
     return Result;
   }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-  void SetupHooks() {
-    Alloc64 = Alloc::OSAllocator::Create64BitAllocator();
+  void InstallHooks() {
 #ifdef ENABLE_JEMALLOC
     __mmap_hook   = FEX_mmap;
     __munmap_hook = FEX_munmap;
 #endif
     FEXCore::Allocator::mmap = FEX_mmap;
     FEXCore::Allocator::munmap = FEX_munmap;
+  }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+  void SetupHooks() {
+    Alloc64 = Alloc::OSAllocator::Create64BitAllocator();
+    InstallHooks();
+  }
+
+  void SetupHooksWithSafeRegions(std::vector<MemoryRegion> *MemoryRegions) {
+    if (!MemoryRegions->empty()) {
+      Alloc64 = Alloc::OSAllocator::Create64BitAllocatorWithMemoryRegions(MemoryRegions);
+      InstallHooks();
+    }
   }
 
   void ClearHooks() {
@@ -121,7 +132,7 @@ namespace FEXCore::Allocator {
         for (int i = 0; i < 64; ++i) {
           // Try grabbing a some of the top pages of the range
           // x86 allocates some high pages in the top end
-          void *Ptr = ::mmap(reinterpret_cast<void*>(Size - FHU::FEX_PAGE_SIZE * i), FHU::FEX_PAGE_SIZE, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+          void *Ptr = mmap(reinterpret_cast<void*>(Size - FHU::FEX_PAGE_SIZE * i), FHU::FEX_PAGE_SIZE, PROT_NONE, MAP_FIXED_NOREPLACE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
           if (Ptr != (void*)~0ULL) {
             ::munmap(Ptr, FHU::FEX_PAGE_SIZE);
             if (Ptr == (void*)(Size - FHU::FEX_PAGE_SIZE * i)) {
@@ -146,7 +157,7 @@ namespace FEXCore::Allocator {
 
   std::vector<MemoryRegion> StealMemoryRegion(uintptr_t Begin, uintptr_t End) {
     std::vector<MemoryRegion> Regions;
-    
+
     int MapsFD = open("/proc/self/maps", O_RDONLY);
     LogMan::Throw::AFmt(MapsFD != -1, "Failed to open /proc/self/maps");
 
@@ -162,7 +173,7 @@ namespace FEXCore::Allocator {
     for(;;) {
 
       if (Remaining == 0) {
-        do { 
+        do {
           Remaining = read(MapsFD, Buffer, sizeof(Buffer));
         } while ( Remaining == -1 && errno == EAGAIN);
 
@@ -181,7 +192,7 @@ namespace FEXCore::Allocator {
           STEAL_LOG("     Reserving\n");
 
           auto MapSize = MapEnd - MapBegin;
-          auto Alloc = mmap((void*)MapBegin, MapSize, PROT_NONE, MAP_ANONYMOUS | MAP_NORESERVE | MAP_PRIVATE | MAP_FIXED_NOREPLACE, -1, 0);
+          auto Alloc = ::mmap((void*)MapBegin, MapSize, PROT_NONE, MAP_ANONYMOUS | MAP_NORESERVE | MAP_PRIVATE | MAP_FIXED_NOREPLACE, -1, 0);
 
           LogMan::Throw::AFmt(Alloc != MAP_FAILED, "mmap({:x},{:x}) failed", MapBegin, MapSize);
           LogMan::Throw::AFmt(Alloc == (void*)MapBegin, "mmap({},{:x}) returned {} instead of {:x}", Alloc, MapBegin);
@@ -211,7 +222,7 @@ namespace FEXCore::Allocator {
 
           auto MapBegin = std::max(RegionEnd, Begin);
           auto MapEnd = std::min(RegionBegin, End);
-          
+
           STEAL_LOG("     MapBegin: %016lX MapEnd: %016lX\n", MapBegin, MapEnd);
 
           if (MapEnd > MapBegin) {

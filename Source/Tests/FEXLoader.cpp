@@ -338,6 +338,7 @@ int main(int argc, char **argv, char **const envp) {
   if (Loader.Is64BitMode()) {
     // Destroy the 48th bit if it exists
     Base48Bit = FEXCore::Allocator::Steal48BitVA();
+    FEXCore::Allocator::SetupHooksWithSafeRegions(&Base48Bit);
   } else {
     FEX_CONFIG_OPT(Use32BitAllocator, FORCE32BITALLOCATOR);
     if (KernelVersion < FEX::HLE::SyscallHandler::KernelVersion(4, 17)) {
