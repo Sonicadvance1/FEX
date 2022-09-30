@@ -156,6 +156,8 @@ namespace FEXCore::Allocator {
   #define STEAL_LOG(...) // fprintf(stderr, __VA_ARGS__)
 
   std::vector<MemoryRegion> StealMemoryRegion(uintptr_t Begin, uintptr_t End) {
+    void *StackLocation = alloca(0);
+    uintptr_t StackLocation_u64 = reinterpret_cast<uintptr_t>(StackLocation);
     std::vector<MemoryRegion> Regions;
 
     int MapsFD = open("/proc/self/maps", O_RDONLY);
@@ -165,6 +167,8 @@ namespace FEXCore::Allocator {
 
     uintptr_t RegionBegin = 0;
     uintptr_t RegionEnd = 0;
+
+    uintptr_t PreviousMapEnd = 0;
 
     char Buffer[2048];
     const char *Cursor;
@@ -236,6 +240,10 @@ namespace FEXCore::Allocator {
 
             Regions.push_back({(void*)MapBegin, MapSize});
           }
+
+          // Store the previous map location
+          PreviousMapEnd = MapEnd;
+
           RegionBegin = 0;
           RegionEnd = 0;
           State = ParseEnd;
@@ -251,6 +259,22 @@ namespace FEXCore::Allocator {
           STEAL_LOG("[%d] ParseEnd; RegionBegin: %016lX RegionEnd: %016lX\n", __LINE__, RegionBegin, RegionEnd);
 
           State = ScanEnd;
+
+          // If the previous map's ending and the region we just parsed overlaps the stack then we need to save the stackmapping.
+          // Otherwise we will only have ~144KB stack size which crashes quickly.
+          if (PreviousMapEnd <= StackLocation_u64 && RegionEnd > StackLocation_u64) {
+            auto BelowStackRegion = Regions.back();
+            LOGMAN_THROW_AA_FMT(reinterpret_cast<uint64_t>(BelowStackRegion.Ptr) + BelowStackRegion.Size == PreviousMapEnd,
+              "This needs to match");
+
+            // Allocate the region under the stack as READ | WRITE so the stack can still grow
+            auto Alloc = mmap(BelowStackRegion.Ptr, BelowStackRegion.Size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_NORESERVE | MAP_PRIVATE | MAP_FIXED, -1, 0);
+
+            LogMan::Throw::AFmt(Alloc != MAP_FAILED, "mmap({:x},{:x}) failed", BelowStackRegion.Ptr, BelowStackRegion.Size);
+            LogMan::Throw::AFmt(Alloc == BelowStackRegion.Ptr, "mmap({},{:x}) returned {} instead of {:x}", Alloc, BelowStackRegion.Ptr);
+
+            Regions.pop_back();
+          }
           continue;
         } else {
           LogMan::Throw::AFmt(std::isalpha(c) || std::isdigit(c), "Unexpected char '{}' in ParseEnd", c);
