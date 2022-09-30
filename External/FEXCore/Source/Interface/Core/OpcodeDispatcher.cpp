@@ -240,11 +240,8 @@ void OpDispatchBuilder::IRETOp(OpcodeArgs) {
   // RIP (64/32/16 bits)
   auto NewRIP = _LoadMem(GPRClass, GPRSize, SP, GPRSize);
   SP = _Add(SP, Constant);
-  // CS (lower 16 used)
-  auto NewSegmentCS = _LoadMem(GPRClass, GPRSize, SP, GPRSize);
-  _StoreContext(2, GPRClass, NewSegmentCS, offsetof(FEXCore::Core::CPUState, cs_idx));
-  UpdatePrefixFromSegment(NewSegmentCS, FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX);
-
+  //CS (lower 16 used)
+  _StoreContext(2, GPRClass, _LoadMem(GPRClass, GPRSize, SP, GPRSize), offsetof(FEXCore::Core::CPUState, cs));
   SP = _Add(SP, Constant);
   //eflags (lower 16 used)
   auto eflags = _LoadMem(GPRClass, GPRSize, SP, GPRSize);
@@ -256,11 +253,8 @@ void OpDispatchBuilder::IRETOp(OpcodeArgs) {
     // FEX doesn't support a CPL mode switch, so don't need to worry about this on 32-bit
     _StoreContext(GPRSize, GPRClass, _LoadMem(GPRClass, GPRSize, SP, GPRSize), RSPOffset);
     SP = _Add(SP, Constant);
-    // ss
-    auto NewSegmentSS = _LoadMem(GPRClass, GPRSize, SP, GPRSize);
-    _StoreContext(2, GPRClass, NewSegmentSS, offsetof(FEXCore::Core::CPUState, ss_idx));
-    UpdatePrefixFromSegment(NewSegmentSS, FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX);
-
+    //ss
+    _StoreContext(2, GPRClass, _LoadMem(GPRClass, GPRSize, SP, GPRSize), offsetof(FEXCore::Core::CPUState, ss));
     SP = _Add(SP, Constant);
   }
   else {
@@ -578,51 +572,26 @@ void OpDispatchBuilder::PUSHSegmentOp(OpcodeArgs) {
   _StoreContext(GPRSize, GPRClass, NewSP, RSPOffset);
 
   OrderedNode *Src{};
-  if (!CTX->Config.Is64BitMode()) {
-    switch (SegmentReg) {
-      case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, es_idx));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, cs_idx));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ss_idx));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ds_idx));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs_idx));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs_idx));
-        break;
-      default: break; // Do nothing
-    }
-  }
-  else {
-    switch (SegmentReg) {
-      case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, es_cached));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, cs_cached));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ss_cached));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ds_cached));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs_cached));
-        break;
-      case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
-        Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs_cached));
-        break;
-      default: break; // Do nothing
-    }
+  switch (SegmentReg) {
+    case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, es));
+      break;
+    case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, cs));
+      break;
+    case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ss));
+      break;
+    case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, ds));
+      break;
+    case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs));
+      break;
+    case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
+      Src = _LoadContext(SrcSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs));
+      break;
+    default: break; // Do nothing
   }
 
   // Store our value to the new stack location
@@ -720,27 +689,25 @@ void OpDispatchBuilder::POPSegmentOp(OpcodeArgs) {
 
   switch (SegmentReg) {
     case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, es_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, es));
       break;
     case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, cs_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, cs));
       break;
     case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ss_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ss));
       break;
     case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ds_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ds));
       break;
     case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, fs_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, fs));
       break;
     case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
-      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, gs_idx));
+      _StoreContext(DstSize, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, gs));
       break;
     default: break; // Do nothing
   }
-
-  UpdatePrefixFromSegment(NewSegment, SegmentReg);
 }
 
 void OpDispatchBuilder::LEAVEOp(OpcodeArgs) {
@@ -1624,13 +1591,11 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
     switch (Op->Dest.Data.GPR.GPR) {
       case 0: // ES
       case FEXCore::X86State::REG_R8: // ES
-        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, es_idx));
-        UpdatePrefixFromSegment(Src, FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX);
+        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, es));
         break;
       case 1: // DS
       case FEXCore::X86State::REG_R11: // DS
-        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, ds_idx));
-        UpdatePrefixFromSegment(Src, FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX);
+        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, ds));
         break;
       case 2: // CS
       case FEXCore::X86State::REG_R9: // CS
@@ -1644,14 +1609,12 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
         break;
       case 3: // SS
       case FEXCore::X86State::REG_R10: // SS
-        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, ss_idx));
-        UpdatePrefixFromSegment(Src, FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX);
+        _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, ss));
         break;
       case 6: // GS
       case FEXCore::X86State::REG_R13: // GS
         if (!CTX->Config.Is64BitMode) {
-          _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, gs_idx));
-          UpdatePrefixFromSegment(Src, FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX);
+          _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, gs));
         } else {
           LogMan::Msg::EFmt("We don't support modifying GS selector in 64bit mode!");
           DecodeFailure = true;
@@ -1660,8 +1623,7 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
       case 7: // FS
       case FEXCore::X86State::REG_R12: // FS
         if (!CTX->Config.Is64BitMode) {
-          _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, fs_idx));
-          UpdatePrefixFromSegment(Src, FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX);
+          _StoreContext(2, GPRClass, Src, offsetof(FEXCore::Core::CPUState, fs));
         } else {
           LogMan::Msg::EFmt("We don't support modifying FS selector in 64bit mode!");
           DecodeFailure = true;
@@ -1679,19 +1641,19 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
     switch (Op->Src[0].Data.GPR.GPR) {
       case 0: // ES
       case FEXCore::X86State::REG_R8: // ES
-        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, es_idx));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, es));
         break;
       case 1: // DS
       case FEXCore::X86State::REG_R11: // DS
-        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ds_idx));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ds));
         break;
       case 2: // CS
       case FEXCore::X86State::REG_R9: // CS
-        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, cs_idx));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, cs));
         break;
       case 3: // SS
       case FEXCore::X86State::REG_R10: // SS
-        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ss_idx));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ss));
         break;
       case 6: // GS
       case FEXCore::X86State::REG_R13: // GS
@@ -1699,7 +1661,7 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
           Segment = _Constant(0);
         }
         else {
-          Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, gs_idx));
+          Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, gs));
         }
         break;
       case 7: // FS
@@ -1708,7 +1670,7 @@ void OpDispatchBuilder::MOVSegOp(OpcodeArgs) {
           Segment = _Constant(0);
         }
         else {
-          Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, fs_idx));
+          Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, fs));
         }
         break;
       default:
@@ -3398,15 +3360,13 @@ void OpDispatchBuilder::XLATOp(OpcodeArgs) {
 
 template<OpDispatchBuilder::Segment Seg>
 void OpDispatchBuilder::ReadSegmentReg(OpcodeArgs) {
-  // 64-bit only
-  // Doesn't hit the segment register optimization
   auto Size = GetSrcSize(Op);
   OrderedNode *Src{};
   if constexpr (Seg == Segment::FS) {
-    Src = _LoadContext(Size, GPRClass, offsetof(FEXCore::Core::CPUState, fs_cached));
+    Src = _LoadContext(Size, GPRClass, offsetof(FEXCore::Core::CPUState, fs));
   }
   else {
-    Src = _LoadContext(Size, GPRClass, offsetof(FEXCore::Core::CPUState, gs_cached));
+    Src = _LoadContext(Size, GPRClass, offsetof(FEXCore::Core::CPUState, gs));
   }
 
   StoreResult(GPRClass, Op, Src, -1);
@@ -3419,10 +3379,10 @@ void OpDispatchBuilder::WriteSegmentReg(OpcodeArgs) {
   auto Size = GetDstSize(Op);
   OrderedNode *Src = LoadSource(GPRClass, Op, Op->Src[0], Op->Flags, -1);
   if constexpr (Seg == Segment::FS) {
-    _StoreContext(Size, GPRClass, Src, offsetof(FEXCore::Core::CPUState, fs_cached));
+    _StoreContext(Size, GPRClass, Src, offsetof(FEXCore::Core::CPUState, fs));
   }
   else {
-    _StoreContext(Size, GPRClass, Src, offsetof(FEXCore::Core::CPUState, gs_cached));
+    _StoreContext(Size, GPRClass, Src, offsetof(FEXCore::Core::CPUState, gs));
   }
 }
 
@@ -4620,10 +4580,10 @@ OrderedNode *OpDispatchBuilder::AppendSegmentOffset(OrderedNode *Value, uint32_t
 
   if (CTX->Config.Is64BitMode) {
     if (Flags & FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX) {
-      Value = _Add(Value, _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs_cached)));
+      Value = _Add(Value, _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs)));
     }
     else if (Flags & FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX) {
-      Value = _Add(Value, _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs_cached)));
+      Value = _Add(Value, _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs)));
     }
     // If there was any other segment in 64bit then it is ignored
   }
@@ -4635,61 +4595,36 @@ OrderedNode *OpDispatchBuilder::AppendSegmentOffset(OrderedNode *Value, uint32_t
       // Or the argument only uses a specific prefix (with override set)
       Prefix = DefaultPrefix;
     }
-    // With the segment register optimization we store the GDT bases directly in the segment register to remove indexed loads
     switch (Prefix) {
       case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, es_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, es));
         break;
       case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, cs_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, cs));
         break;
       case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, ss_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ss));
         break;
       case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, ds_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, ds));
         break;
       case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, fs_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, fs));
         break;
       case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
-        Segment = _LoadContext(GPRSize, GPRClass, offsetof(FEXCore::Core::CPUState, gs_cached));
+        Segment = _LoadContext(2, GPRClass, offsetof(FEXCore::Core::CPUState, gs));
         break;
       default: break; // Do nothing
     }
 
     if (Segment) {
-      Value = _Add(Value, Segment);
+      Segment = _Lshr(Segment, _Constant(3));
+      auto data = _LoadContextIndexed(Segment, 4, offsetof(FEXCore::Core::CPUState, gdt[0]), 4, GPRClass);
+      Value = _Add(Value, data);
     }
   }
 
   return Value;
-}
-
-void OpDispatchBuilder::UpdatePrefixFromSegment(OrderedNode *Segment, uint32_t SegmentReg) {
-  Segment = _Lshr(Segment, _Constant(3));
-  auto NewSegment = _LoadContextIndexed(Segment, 4, offsetof(FEXCore::Core::CPUState, gdt[0]), 4, GPRClass);
-  switch (SegmentReg) {
-    case FEXCore::X86Tables::DecodeFlags::FLAG_ES_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, es_cached));
-      break;
-    case FEXCore::X86Tables::DecodeFlags::FLAG_CS_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, cs_cached));
-      break;
-    case FEXCore::X86Tables::DecodeFlags::FLAG_SS_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ss_cached));
-      break;
-    case FEXCore::X86Tables::DecodeFlags::FLAG_DS_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, ds_cached));
-      break;
-    case FEXCore::X86Tables::DecodeFlags::FLAG_FS_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, fs_cached));
-      break;
-    case FEXCore::X86Tables::DecodeFlags::FLAG_GS_PREFIX:
-      _StoreContext(4, GPRClass, NewSegment, offsetof(FEXCore::Core::CPUState, gs_cached));
-      break;
-    default: break; // Do nothing
-  }
 }
 
 OrderedNode *OpDispatchBuilder::LoadSource_WithOpSize(FEXCore::IR::RegisterClassType Class, FEXCore::X86Tables::DecodedOp const& Op, FEXCore::X86Tables::DecodedOperand const& Operand, uint8_t OpSize, uint32_t Flags, int8_t Align, bool LoadData, bool ForceLoad, MemoryAccessType AccessType) {

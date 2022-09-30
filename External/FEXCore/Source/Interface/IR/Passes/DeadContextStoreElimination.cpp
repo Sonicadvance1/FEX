@@ -76,6 +76,24 @@ namespace {
     std::vector<ContextMemberInfo> ClassificationInfo;
   };
 
+  constexpr static std::array<LastAccessType, 15> DefaultAccess = {
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_INVALID, // SSE padding in non-AVX case
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+    ACCESS_NONE,
+  };
+
   static void ClassifyContextStruct(ContextInfo *ContextClassificationInfo, bool SupportsAVX) {
     auto ContextClassification = &ContextClassificationInfo->ClassificationInfo;
 
@@ -84,7 +102,7 @@ namespace {
         offsetof(FEXCore::Core::CPUState, rip),
         sizeof(FEXCore::Core::CPUState::rip),
       },
-      ACCESS_NONE,
+      DefaultAccess[0],
       FEXCore::IR::InvalidClass,
     });
 
@@ -94,134 +112,62 @@ namespace {
           offsetof(FEXCore::Core::CPUState, gregs[0]) + sizeof(FEXCore::Core::CPUState::gregs[0]) * i,
           FEXCore::Core::CPUState::GPR_REG_SIZE,
         },
-        ACCESS_NONE,
+        DefaultAccess[1],
         FEXCore::IR::InvalidClass,
       });
     }
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, es_idx),
-        sizeof(FEXCore::Core::CPUState::es_idx),
+        offsetof(FEXCore::Core::CPUState, es),
+        sizeof(FEXCore::Core::CPUState::es),
       },
-      ACCESS_NONE,
+      DefaultAccess[2],
       FEXCore::IR::InvalidClass,
     });
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, cs_idx),
-        sizeof(FEXCore::Core::CPUState::cs_idx),
+        offsetof(FEXCore::Core::CPUState, cs),
+        sizeof(FEXCore::Core::CPUState::cs),
       },
-      ACCESS_NONE,
+      DefaultAccess[3],
       FEXCore::IR::InvalidClass,
     });
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, ss_idx),
-        sizeof(FEXCore::Core::CPUState::ss_idx),
+        offsetof(FEXCore::Core::CPUState, ss),
+        sizeof(FEXCore::Core::CPUState::ss),
       },
-      ACCESS_NONE,
+      DefaultAccess[4],
       FEXCore::IR::InvalidClass,
     });
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, ds_idx),
-        sizeof(FEXCore::Core::CPUState::ds_idx),
+        offsetof(FEXCore::Core::CPUState, ds),
+        sizeof(FEXCore::Core::CPUState::ds),
       },
-      ACCESS_NONE,
+      DefaultAccess[5],
       FEXCore::IR::InvalidClass,
     });
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, gs_idx),
-        sizeof(FEXCore::Core::CPUState::gs_idx),
+        offsetof(FEXCore::Core::CPUState, gs),
+        sizeof(FEXCore::Core::CPUState::gs),
       },
-      ACCESS_NONE,
+      DefaultAccess[6],
       FEXCore::IR::InvalidClass,
     });
 
     ContextClassification->emplace_back(ContextMemberInfo{
       ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, fs_idx),
-        sizeof(FEXCore::Core::CPUState::fs_idx),
+        offsetof(FEXCore::Core::CPUState, fs),
+        sizeof(FEXCore::Core::CPUState::fs),
       },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, _pad),
-        sizeof(FEXCore::Core::CPUState::_pad),
-      },
-      ACCESS_INVALID,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, es_cached),
-        sizeof(FEXCore::Core::CPUState::es_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, cs_cached),
-        sizeof(FEXCore::Core::CPUState::cs_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, ss_cached),
-        sizeof(FEXCore::Core::CPUState::ss_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, ds_cached),
-        sizeof(FEXCore::Core::CPUState::ds_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, gs_cached),
-        sizeof(FEXCore::Core::CPUState::gs_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, fs_cached),
-        sizeof(FEXCore::Core::CPUState::fs_cached),
-      },
-      ACCESS_NONE,
-      FEXCore::IR::InvalidClass,
-    });
-
-    ContextClassification->emplace_back(ContextMemberInfo{
-      ContextMemberClassification {
-        offsetof(FEXCore::Core::CPUState, _pad2),
-        sizeof(FEXCore::Core::CPUState::_pad2),
-      },
-      ACCESS_INVALID,
+      DefaultAccess[7],
       FEXCore::IR::InvalidClass,
     });
 
@@ -232,7 +178,7 @@ namespace {
             offsetof(FEXCore::Core::CPUState, xmm.avx.data[0][0]) + FEXCore::Core::CPUState::XMM_AVX_REG_SIZE * i,
             FEXCore::Core::CPUState::XMM_AVX_REG_SIZE,
           },
-          ACCESS_NONE,
+          DefaultAccess[8],
           FEXCore::IR::InvalidClass,
         });
       }
@@ -243,7 +189,7 @@ namespace {
             offsetof(FEXCore::Core::CPUState, xmm.sse.data[0][0]) + FEXCore::Core::CPUState::XMM_SSE_REG_SIZE * i,
             FEXCore::Core::CPUState::XMM_SSE_REG_SIZE,
           },
-          ACCESS_NONE,
+          DefaultAccess[8],
           FEXCore::IR::InvalidClass,
         });
       }
@@ -253,7 +199,7 @@ namespace {
             offsetof(FEXCore::Core::CPUState, xmm.sse.pad[0][0]),
             static_cast<uint16_t>(FEXCore::Core::CPUState::XMM_SSE_REG_SIZE * FEXCore::Core::CPUState::NUM_XMMS),
           },
-          ACCESS_INVALID,
+          DefaultAccess[9],
           FEXCore::IR::InvalidClass,
         });
     }
@@ -264,7 +210,7 @@ namespace {
           offsetof(FEXCore::Core::CPUState, flags[0]) + sizeof(FEXCore::Core::CPUState::flags[0]) * i,
           FEXCore::Core::CPUState::FLAG_SIZE,
         },
-        ACCESS_NONE,
+        DefaultAccess[10],
         FEXCore::IR::InvalidClass,
       });
     }
@@ -275,7 +221,7 @@ namespace {
           offsetof(FEXCore::Core::CPUState, mm[0][0]) + sizeof(FEXCore::Core::CPUState::mm[0]) * i,
           FEXCore::Core::CPUState::MM_REG_SIZE
         },
-        ACCESS_NONE,
+        DefaultAccess[11],
         FEXCore::IR::InvalidClass,
       });
     }
@@ -287,7 +233,7 @@ namespace {
           offsetof(FEXCore::Core::CPUState, gdt[0]) + sizeof(FEXCore::Core::CPUState::gdt[0]) * i,
           sizeof(FEXCore::Core::CPUState::gdt[0]),
         },
-        ACCESS_NONE,
+        DefaultAccess[12],
         FEXCore::IR::InvalidClass,
       });
     }
@@ -298,7 +244,7 @@ namespace {
         offsetof(FEXCore::Core::CPUState, FCW),
         sizeof(FEXCore::Core::CPUState::FCW),
       },
-      ACCESS_NONE,
+      DefaultAccess[13],
       FEXCore::IR::InvalidClass,
     });
 
@@ -308,7 +254,7 @@ namespace {
         offsetof(FEXCore::Core::CPUState, FTW),
         sizeof(FEXCore::Core::CPUState::FTW),
       },
-      ACCESS_NONE,
+      DefaultAccess[14],
       FEXCore::IR::InvalidClass,
     });
 
@@ -342,55 +288,40 @@ namespace {
       ContextClassification->at(Offset).StoreNode = nullptr;
     };
     size_t Offset = 0;
-    SetAccess(Offset++, ACCESS_NONE);
+    SetAccess(Offset++, DefaultAccess[0]);
     for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_GPRS; ++i) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[1]);
     }
 
-    // Segment indexes
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-
-    // Pad
-    SetAccess(Offset++, ACCESS_INVALID);
-
-    // Segments
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
-
-    // Pad2
-    SetAccess(Offset++, ACCESS_INVALID);
+    SetAccess(Offset++, DefaultAccess[2]);
+    SetAccess(Offset++, DefaultAccess[3]);
+    SetAccess(Offset++, DefaultAccess[4]);
+    SetAccess(Offset++, DefaultAccess[5]);
+    SetAccess(Offset++, DefaultAccess[6]);
+    SetAccess(Offset++, DefaultAccess[7]);
 
     for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_XMMS; ++i) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[8]);
     }
 
     if (!SupportsAVX) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[9]);
     }
 
     for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_FLAGS; ++i) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[10]);
     }
 
     for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_MMS; ++i) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[11]);
     }
 
     for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_GDTS; ++i) {
-      SetAccess(Offset++, ACCESS_NONE);
+      SetAccess(Offset++, DefaultAccess[12]);
     }
 
-    SetAccess(Offset++, ACCESS_NONE);
-    SetAccess(Offset++, ACCESS_NONE);
+    SetAccess(Offset++, DefaultAccess[13]);
+    SetAccess(Offset++, DefaultAccess[14]);
   }
 
   struct BlockInfo {
