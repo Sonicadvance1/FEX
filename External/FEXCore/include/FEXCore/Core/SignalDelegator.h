@@ -32,7 +32,7 @@ namespace Core {
   using HostSignalDelegatorFunction = std::function<bool(FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext)>;
   using HostSignalDelegatorFunctionForGuest = std::function<bool(FEXCore::Core::InternalThreadState *Thread, int Signal, void *info, void *ucontext, GuestSigAction *GuestAction, stack_t *GuestStack)>;
 
-  class SignalDelegator {
+  class FEX_DEFAULT_VISIBILITY SignalDelegator {
   public:
     virtual ~SignalDelegator() = default;
 
@@ -41,26 +41,26 @@ namespace Core {
      *
      * Required to know which thread has received the signal when it occurs
      */
-    void RegisterTLSState(FEXCore::Core::InternalThreadState *Thread);
-    void UninstallTLSState(FEXCore::Core::InternalThreadState *Thread);
+    FEX_DEFAULT_VISIBILITY void RegisterTLSState(FEXCore::Core::InternalThreadState *Thread);
+    FEX_DEFAULT_VISIBILITY void UninstallTLSState(FEXCore::Core::InternalThreadState *Thread);
 
     /**
      * @brief Registers a signal handler for the host to handle a signal
      *
      * It's a process level signal handler so one must be careful
      */
-    void RegisterHostSignalHandler(int Signal, HostSignalDelegatorFunction Func, bool Required);
-    void RegisterFrontendHostSignalHandler(int Signal, HostSignalDelegatorFunction Func, bool Required);
+    FEX_DEFAULT_VISIBILITY void RegisterHostSignalHandler(int Signal, HostSignalDelegatorFunction Func, bool Required);
+    FEX_DEFAULT_VISIBILITY void RegisterFrontendHostSignalHandler(int Signal, HostSignalDelegatorFunction Func, bool Required);
 
     /**
      * @brief Registers a signal handler for the host to handle a signal specifically for guest handling
      *
      * It's a process level signal handler so one must be careful
      */
-    virtual void RegisterHostSignalHandlerForGuest(int Signal, HostSignalDelegatorFunctionForGuest Func) = 0;
+    FEX_DEFAULT_VISIBILITY virtual void RegisterHostSignalHandlerForGuest(int Signal, HostSignalDelegatorFunctionForGuest Func) = 0;
 
     // Called from the thunk handler to handle the signal
-    void HandleSignal(int Signal, void *Info, void *UContext);
+    FEX_DEFAULT_VISIBILITY void HandleSignal(int Signal, void *Info, void *UContext);
 
     /**
      * @brief Check to ensure the XID handler is still set to the FEX handler
@@ -68,7 +68,7 @@ namespace Core {
      * On a new thread GLIBC will set the XID handler underneath us.
      * After the first thread is created check this.
      */
-    virtual void CheckXIDHandler() = 0;
+    FEX_DEFAULT_VISIBILITY virtual void CheckXIDHandler() = 0;
 
     constexpr static size_t MAX_SIGNALS {64};
 

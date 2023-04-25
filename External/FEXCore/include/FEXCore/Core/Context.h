@@ -100,7 +100,7 @@ namespace FEXCore::Context {
        *
        * @return a new context object
        */
-      FEX_DEFAULT_VISIBILITY static fextl::unique_ptr<FEXCore::Context::Context> CreateNewContext();
+      FEX_DEFAULT_VISIBILITY static fextl::unique_ptr<::FEXCore::Context::Context> CreateNewContext();
 
       /**
        * @brief Post creation context initialization
@@ -205,7 +205,7 @@ namespace FEXCore::Context {
        * @param CTX The context that we created
        * @param State The state object to populate
        */
-      FEX_DEFAULT_VISIBILITY virtual void GetCPUState(FEXCore::Core::CPUState *State) const = 0;
+      FEX_DEFAULT_VISIBILITY virtual void GetCPUState(::FEXCore::Core::CPUState *State) const = 0;
 
       /**
        * @brief Copies the CPUState provided to the parent thread
@@ -213,7 +213,7 @@ namespace FEXCore::Context {
        * @param CTX The context that we created
        * @param State The satate object to copy from
        */
-      FEX_DEFAULT_VISIBILITY virtual void SetCPUState(const FEXCore::Core::CPUState *State) = 0;
+      FEX_DEFAULT_VISIBILITY virtual void SetCPUState(const ::FEXCore::Core::CPUState *State) = 0;
 
       /**
        * @brief Allows the frontend to pass in a custom CPUBackend creation factory
@@ -266,7 +266,7 @@ namespace FEXCore::Context {
       FEX_DEFAULT_VISIBILITY virtual void UnloadAOTIRCacheEntry(FEXCore::IR::AOTIRCacheEntry *Entry) = 0;
 
       FEX_DEFAULT_VISIBILITY virtual void SetAOTIRLoader(std::function<int(const fextl::string&)> CacheReader) = 0;
-      FEX_DEFAULT_VISIBILITY virtual void SetAOTIRWriter(std::function<fextl::unique_ptr<AOTIRWriter>(const fextl::string&)> CacheWriter) = 0;
+      FEX_DEFAULT_VISIBILITY virtual void SetAOTIRWriter(std::function<fextl::unique_ptr<::FEXCore::Context::AOTIRWriter>(const fextl::string&)> CacheWriter) = 0;
       FEX_DEFAULT_VISIBILITY virtual void SetAOTIRRenamer(std::function<void(const fextl::string&)> CacheRenamer) = 0;
 
       FEX_DEFAULT_VISIBILITY virtual void FinalizeAOTIRCache() = 0;
@@ -276,7 +276,7 @@ namespace FEXCore::Context {
       FEX_DEFAULT_VISIBILITY virtual void MarkMemoryShared() = 0;
 
       FEX_DEFAULT_VISIBILITY virtual void ConfigureAOTGen(FEXCore::Core::InternalThreadState *Thread, fextl::set<uint64_t> *ExternalBranches, uint64_t SectionMaxAddress) = 0;
-      FEX_DEFAULT_VISIBILITY virtual CustomIRResult AddCustomIREntrypoint(uintptr_t Entrypoint, std::function<void(uintptr_t Entrypoint, FEXCore::IR::IREmitter *)> Handler, void *Creator = nullptr, void *Data = nullptr) = 0;
+      FEX_DEFAULT_VISIBILITY virtual CustomIRResult AddCustomIREntrypoint(uintptr_t Entrypoint, std::function<void(uintptr_t Entrypoint, ::FEXCore::IR::IREmitter *)> Handler, void *Creator = nullptr, void *Data = nullptr) = 0;
 
       /**
        * @brief Allows the frontend to register its own thunk handlers independent of what is controlled in the backend.
@@ -284,14 +284,14 @@ namespace FEXCore::Context {
        * @param CTX A valid non-null context instance.
        * @param Definitions A vector of thunk definitions that the frontend controls
        */
-      FEX_DEFAULT_VISIBILITY virtual void AppendThunkDefinitions(fextl::vector<FEXCore::IR::ThunkDefinition> const& Definitions) = 0;
+      FEX_DEFAULT_VISIBILITY virtual void AppendThunkDefinitions(fextl::vector<::FEXCore::IR::ThunkDefinition> const& Definitions) = 0;
 
-      FEX_DEFAULT_VISIBILITY virtual void SetVDSOSigReturn(const VDSOSigReturn &Pointers) = 0;
+      FEX_DEFAULT_VISIBILITY virtual void SetVDSOSigReturn(const ::FEXCore::Context::VDSOSigReturn &Pointers) = 0;
     private:
   };
 
   /**
    * @brief This initializes internal FEXCore state that is shared between contexts and requires overhead to setup
    */
-  FEX_DEFAULT_VISIBILITY void InitializeStaticTables(OperatingMode Mode = MODE_64BIT);
+  FEX_DEFAULT_VISIBILITY void InitializeStaticTables(::FEXCore::Context::OperatingMode Mode = MODE_64BIT);
 }

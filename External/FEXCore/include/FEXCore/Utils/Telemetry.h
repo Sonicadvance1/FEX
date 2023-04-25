@@ -43,7 +43,7 @@ namespace FEXCore::Telemetry {
   Value &GetObject(TelemetryType Type);
 
   FEX_DEFAULT_VISIBILITY void Initialize();
-  FEX_DEFAULT_VISIBILITY void Shutdown(fextl::string const &ApplicationName);
+  FEX_DEFAULT_VISIBILITY void Shutdown(::fextl::string const &ApplicationName);
 
 // Telemetry object declaration
 // This returns the internal structure to the telemetry data structures

@@ -1,3 +1,4 @@
+#include <FEXCore/Utils/CPUInfo.h>
 #include <FEXHeaderUtils/Filesystem.h>
 
 #include <fmt/format.h>

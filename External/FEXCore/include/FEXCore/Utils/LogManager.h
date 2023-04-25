@@ -24,7 +24,7 @@ constexpr DebugLevels MSG_LEVEL = INFO;
 
 namespace Throw {
 using ThrowHandler = void(*)(char const *Message);
-FEX_DEFAULT_VISIBILITY void InstallHandler(ThrowHandler Handler);
+FEX_DEFAULT_VISIBILITY void InstallHandler(::LogMan::Throw::ThrowHandler Handler);
 FEX_DEFAULT_VISIBILITY void UnInstallHandlers();
 
 [[noreturn]] void MFmt(const char *fmt, const fmt::format_args& args);
@@ -61,14 +61,14 @@ static inline void AAFmt(bool pred, const char*, ...) { __builtin_assume(pred); 
 
 namespace Msg {
 using MsgHandler = void(*)(DebugLevels Level, char const *Message);
-FEX_DEFAULT_VISIBILITY void InstallHandler(MsgHandler Handler);
+FEX_DEFAULT_VISIBILITY void InstallHandler(::LogMan::Msg::MsgHandler Handler);
 FEX_DEFAULT_VISIBILITY void UnInstallHandlers();
 
 FEX_DEFAULT_VISIBILITY void D(const char *fmt, ...);
 
 // Fmt-capable interface.
 
-FEX_DEFAULT_VISIBILITY void MFmtImpl(DebugLevels level, const char* fmt, const fmt::format_args& args);
+FEX_DEFAULT_VISIBILITY void MFmtImpl(::LogMan::DebugLevels level, const char* fmt, const fmt::format_args& args);
 
 template <typename... Args>
 static inline void MFmt(DebugLevels level, const char* fmt, const Args&... args) {

@@ -487,30 +487,30 @@ constexpr size_t MAX_XOP_GROUP_TABLE_SIZE = (1 << 6);
 
 constexpr size_t MAX_EVEX_TABLE_SIZE = 256;
 
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_PRIMARY_TABLE_SIZE> BaseOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_SECOND_TABLE_SIZE> SecondBaseOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_REP_MOD_TABLE_SIZE> RepModOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_REPNE_MOD_TABLE_SIZE> RepNEModOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_OPSIZE_MOD_TABLE_SIZE> OpSizeModOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_PRIMARY_TABLE_SIZE> BaseOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_SECOND_TABLE_SIZE> SecondBaseOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_REP_MOD_TABLE_SIZE> RepModOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_REPNE_MOD_TABLE_SIZE> RepNEModOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_OPSIZE_MOD_TABLE_SIZE> OpSizeModOps;
 
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_INST_GROUP_TABLE_SIZE> PrimaryInstGroupOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_INST_SECOND_GROUP_TABLE_SIZE> SecondInstGroupOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_SECOND_MODRM_TABLE_SIZE> SecondModRMTableOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_X87_TABLE_SIZE> X87Ops;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_3DNOW_TABLE_SIZE> DDDNowOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_0F_38_TABLE_SIZE> H0F38TableOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_0F_3A_TABLE_SIZE> H0F3ATableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_INST_GROUP_TABLE_SIZE> PrimaryInstGroupOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_INST_SECOND_GROUP_TABLE_SIZE> SecondInstGroupOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_SECOND_MODRM_TABLE_SIZE> SecondModRMTableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_X87_TABLE_SIZE> X87Ops;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_3DNOW_TABLE_SIZE> DDDNowOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_0F_38_TABLE_SIZE> H0F38TableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_0F_3A_TABLE_SIZE> H0F3ATableOps;
 
 // VEX
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_VEX_TABLE_SIZE> VEXTableOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_VEX_GROUP_TABLE_SIZE> VEXTableGroupOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_VEX_TABLE_SIZE> VEXTableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_VEX_GROUP_TABLE_SIZE> VEXTableGroupOps;
 
 // XOP
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_XOP_TABLE_SIZE> XOPTableOps;
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_XOP_GROUP_TABLE_SIZE> XOPTableGroupOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_XOP_TABLE_SIZE> XOPTableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_XOP_GROUP_TABLE_SIZE> XOPTableGroupOps;
 
 // EVEX
-extern FEX_DEFAULT_VISIBILITY std::array<X86InstInfo, MAX_EVEX_TABLE_SIZE> EVEXTableOps;
+extern std::array<::FEXCore::X86Tables::X86InstInfo, MAX_EVEX_TABLE_SIZE> EVEXTableOps;
 }
 
 template <>

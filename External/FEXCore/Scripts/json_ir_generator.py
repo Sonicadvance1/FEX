@@ -354,12 +354,12 @@ def print_ir_sizes():
 
     output_file.write("[[maybe_unused, nodiscard]] static size_t GetSize(IROps Op) { return IRSizes[Op]; }\n\n")
 
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] std::string_view const& GetName(IROps Op);\n")
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] uint8_t GetArgs(IROps Op);\n")
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] uint8_t GetRAArgs(IROps Op);\n")
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] FEXCore::IR::RegisterClassType GetRegClass(IROps Op);\n\n")
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] bool HasSideEffects(IROps Op);\n")
-    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] bool GetHasDest(IROps Op);\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] std::string_view const& GetName(::FEXCore::IR::IROps Op);\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] uint8_t GetArgs(::FEXCore::IR::IROps Op);\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] uint8_t GetRAArgs(::FEXCore::IR::IROps Op);\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] ::FEXCore::IR::RegisterClassType GetRegClass(::FEXCore::IR::IROps Op);\n\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] bool HasSideEffects(::FEXCore::IR::IROps Op);\n")
+    output_file.write("[[nodiscard, gnu::const, gnu::visibility(\"default\")]] bool GetHasDest(::FEXCore::IR::IROps Op);\n")
 
     output_file.write("#undef IROP_SIZES\n")
     output_file.write("#endif\n\n")

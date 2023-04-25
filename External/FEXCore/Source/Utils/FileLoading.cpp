@@ -1,5 +1,6 @@
 #include <FEXCore/fextl/string.h>
 #include <FEXCore/fextl/vector.h>
+#include <FEXCore/Utils/FileLoading.h>
 
 #include <fcntl.h>
 #include <sys/stat.h>

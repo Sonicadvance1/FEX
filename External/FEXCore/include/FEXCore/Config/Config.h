@@ -171,14 +171,14 @@ namespace Type {
 
   FEX_DEFAULT_VISIBILITY void Load();
   FEX_DEFAULT_VISIBILITY void ReloadMetaLayer();
-  FEX_DEFAULT_VISIBILITY fextl::string FindContainer();
-  FEX_DEFAULT_VISIBILITY fextl::string FindContainerPrefix();
+  FEX_DEFAULT_VISIBILITY ::fextl::string FindContainer();
+  FEX_DEFAULT_VISIBILITY ::fextl::string FindContainerPrefix();
 
-  FEX_DEFAULT_VISIBILITY void AddLayer(fextl::unique_ptr<FEXCore::Config::Layer> _Layer);
+  FEX_DEFAULT_VISIBILITY void AddLayer(::fextl::unique_ptr<::FEXCore::Config::Layer> _Layer);
 
   FEX_DEFAULT_VISIBILITY bool Exists(ConfigOption Option);
-  FEX_DEFAULT_VISIBILITY std::optional<LayerValue*> All(ConfigOption Option);
-  FEX_DEFAULT_VISIBILITY std::optional<fextl::string*> Get(ConfigOption Option);
+  FEX_DEFAULT_VISIBILITY std::optional<::FEXCore::Config::LayerValue*> All(ConfigOption Option);
+  FEX_DEFAULT_VISIBILITY std::optional<::fextl::string*> Get(ConfigOption Option);
 
   FEX_DEFAULT_VISIBILITY void Set(ConfigOption Option, std::string_view Data);
   FEX_DEFAULT_VISIBILITY void Erase(ConfigOption Option);

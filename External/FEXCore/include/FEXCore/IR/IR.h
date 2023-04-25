@@ -565,8 +565,8 @@ public:
 class IRListView;
 class IREmitter;
 
-FEX_DEFAULT_VISIBILITY void Dump(fextl::stringstream *out, IRListView const* IR, IR::RegisterAllocationData *RAData);
-FEX_DEFAULT_VISIBILITY fextl::unique_ptr<IREmitter> Parse(FEXCore::Utils::IntrusivePooledAllocator &ThreadAllocator, fextl::stringstream &MapsStream);
+FEX_DEFAULT_VISIBILITY void Dump(fextl::stringstream *out, ::FEXCore::IR::IRListView const* IR, ::FEXCore::IR::RegisterAllocationData *RAData);
+FEX_DEFAULT_VISIBILITY fextl::unique_ptr<::FEXCore::IR::IREmitter> Parse(::FEXCore::Utils::IntrusivePooledAllocator &ThreadAllocator, fextl::stringstream &MapsStream);
 
 template<typename Type>
 inline NodeID NodeWrapperBase<Type>::ID() const {
