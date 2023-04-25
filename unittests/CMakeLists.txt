@@ -14,4 +14,5 @@ endif()
 
 if (BUILD_FEX_LINUX_TESTS)
   add_subdirectory(FEXLinuxTests/)
+  add_subdirectory(FEXCore_api/)
 endif()
