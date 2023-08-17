@@ -62,7 +62,7 @@ if (NOT MINGW_BUILD)
       ${CMAKE_INSTALL_PREFIX}/share/binfmts/box64)
 
     find_program(UPDATE_BINFMTS_PROGRAM update-binfmts)
-    if (UPDATE_BINFMTS_PROGRAM)
+    if (FALSE)
       add_custom_target(binfmt_misc_32
         echo "Attempting to install FEX-x86 misc now."
         COMMAND "${CMAKE_SOURCE_DIR}/Scripts/CheckBinfmtNotInstall.sh" ${CONFLICTING_BINFMTS_32}
@@ -101,7 +101,7 @@ if (NOT MINGW_BUILD)
           echo "Attempting to install FEX-x86 misc now."
         COMMAND ${CMAKE_COMMAND} -E
           echo
-          ':FEX-x86:M:0:\\x7fELF\\x01\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x03\\x00:\\xff\\xff\\xff\\xff\\xff\\xfe\\xfe\\x00\\x00\\x00\\x00\\xff\\xff\\xff\\xff\\xff\\xfe\\xff\\xff\\xff:${CMAKE_INSTALL_PREFIX}/bin/FEXInterpreter:POCF' > /proc/sys/fs/binfmt_misc/register
+          ':FEX-x86:M:0:\\x7fELF\\x01\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x03\\x00:\\xff\\xff\\xff\\xff\\xff\\xfe\\xfe\\x00\\x00\\x00\\x00\\xff\\xff\\xff\\xff\\xff\\xfe\\xff\\xff\\xff:${CMAKE_INSTALL_PREFIX}/bin/FEXInterpreter:POCFI' > /proc/sys/fs/binfmt_misc/register
         COMMAND ${CMAKE_COMMAND} -E
           echo "binfmt_misc FEX-x86 installed"
         )
@@ -114,7 +114,7 @@ if (NOT MINGW_BUILD)
           echo "Attempting to install FEX-x86_64 misc now."
         COMMAND ${CMAKE_COMMAND} -E
           echo
-          ':FEX-x86_64:M:0:\\x7fELF\\x02\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x3e\\x00:\\xff\\xff\\xff\\xff\\xff\\xfe\\xfe\\x00\\x00\\x00\\x00\\xff\\xff\\xff\\xff\\xff\\xfe\\xff\\xff\\xff:${CMAKE_INSTALL_PREFIX}/bin/FEXInterpreter:POCF' > /proc/sys/fs/binfmt_misc/register
+          ':FEX-x86_64:M:0:\\x7fELF\\x02\\x01\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x02\\x00\\x3e\\x00:\\xff\\xff\\xff\\xff\\xff\\xfe\\xfe\\x00\\x00\\x00\\x00\\xff\\xff\\xff\\xff\\xff\\xfe\\xff\\xff\\xff:${CMAKE_INSTALL_PREFIX}/bin/FEXInterpreter:POCFI' > /proc/sys/fs/binfmt_misc/register
         COMMAND ${CMAKE_COMMAND} -E
           echo "binfmt_misc FEX-x86_64 installed"
         )

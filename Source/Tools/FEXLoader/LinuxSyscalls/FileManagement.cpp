@@ -506,8 +506,7 @@ static bool ShouldSkipOpenInEmu(int flags) {
 }
 
 uint64_t FileManager::Open(const char *pathname, int flags, uint32_t mode) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
   int fd = -1;
 
   if (!ShouldSkipOpenInEmu(flags)) {
@@ -540,8 +539,7 @@ uint64_t FileManager::CloseRange(unsigned int first, unsigned int last, unsigned
 }
 
 uint64_t FileManager::Stat(const char *pathname, void *buf) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   // Stat follows symlinks
   FDPathTmpData TmpFilename;
@@ -555,8 +553,7 @@ uint64_t FileManager::Stat(const char *pathname, void *buf) {
 }
 
 uint64_t FileManager::Lstat(const char *pathname, void *buf) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   // lstat does not follow symlinks
   FDPathTmpData TmpFilename;
@@ -571,8 +568,7 @@ uint64_t FileManager::Lstat(const char *pathname, void *buf) {
 }
 
 uint64_t FileManager::Access(const char *pathname, [[maybe_unused]] int mode) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   // Access follows symlinks
   FDPathTmpData TmpFilename;
@@ -586,8 +582,7 @@ uint64_t FileManager::Access(const char *pathname, [[maybe_unused]] int mode) {
 }
 
 uint64_t FileManager::FAccessat(int dirfd, const char *pathname, int mode) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(dirfd, SelfPath, true, TmpFilename);
@@ -601,8 +596,7 @@ uint64_t FileManager::FAccessat(int dirfd, const char *pathname, int mode) {
 }
 
 uint64_t FileManager::FAccessat2(int dirfd, const char *pathname, int mode, int flags) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(dirfd, SelfPath, (flags & AT_SYMLINK_NOFOLLOW) == 0, TmpFilename);
@@ -618,17 +612,6 @@ uint64_t FileManager::FAccessat2(int dirfd, const char *pathname, int mode, int 
 uint64_t FileManager::Readlink(const char *pathname, char *buf, size_t bufsiz) {
   // calculate the non-self link to exe
   // Some executables do getpid, stat("/proc/$pid/exe")
-  char PidSelfPath[50];
-  snprintf(PidSelfPath, 50, "/proc/%i/exe", CurrentPID);
-
-  if (strcmp(pathname, "/proc/self/exe") == 0 ||
-      strcmp(pathname, "/proc/thread-self/exe") == 0 ||
-      strcmp(pathname, PidSelfPath) == 0) {
-    auto App = Filename();
-    strncpy(buf, App.c_str(), bufsiz);
-    return std::min(bufsiz, App.size());
-  }
-
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(AT_FDCWD, pathname, false, TmpFilename);
   if (Path.first != -1) {
@@ -648,8 +631,7 @@ uint64_t FileManager::Readlink(const char *pathname, char *buf, size_t bufsiz) {
 }
 
 uint64_t FileManager::Chmod(const char *pathname, mode_t mode) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(AT_FDCWD, SelfPath, false, TmpFilename);
@@ -696,17 +678,6 @@ uint64_t FileManager::Readlinkat(int dirfd, const char *pathname, char *buf, siz
     }
   }
 
-  char PidSelfPath[50];
-  snprintf(PidSelfPath, 50, "/proc/%i/exe", CurrentPID);
-
-  if (Path == "/proc/self/exe" ||
-      Path == "/proc/thread-self/exe" ||
-      Path == PidSelfPath) {
-    auto App = Filename();
-    strncpy(buf, App.c_str(), bufsiz);
-    return std::min(bufsiz, App.size());
-  }
-
   FDPathTmpData TmpFilename;
   auto NewPath = GetEmulatedFDPath(dirfd, pathname, false, TmpFilename);
   if (NewPath.first != -1) {
@@ -726,9 +697,7 @@ uint64_t FileManager::Readlinkat(int dirfd, const char *pathname, char *buf, siz
 }
 
 uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char *pathname, int flags, uint32_t mode) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
-
+  const char *SelfPath = pathname;
   int32_t fd = -1;
 
   if (!ShouldSkipOpenInEmu(flags)) {
@@ -750,9 +719,7 @@ uint64_t FileManager::Openat([[maybe_unused]] int dirfs, const char *pathname, i
 }
 
 uint64_t FileManager::Openat2(int dirfs, const char *pathname, FEX::HLE::open_how *how, size_t usize) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
-
+  const char *SelfPath = pathname;
   int32_t fd = -1;
 
   if (!ShouldSkipOpenInEmu(how->flags)) {
@@ -775,8 +742,7 @@ uint64_t FileManager::Openat2(int dirfs, const char *pathname, FEX::HLE::open_ho
 }
 
 uint64_t FileManager::Statx(int dirfd, const char *pathname, int flags, uint32_t mask, struct statx *statxbuf) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(dirfd, SelfPath, (flags & AT_SYMLINK_NOFOLLOW) == 0, TmpFilename);
@@ -789,8 +755,7 @@ uint64_t FileManager::Statx(int dirfd, const char *pathname, int flags, uint32_t
 }
 
 uint64_t FileManager::Mknod(const char *pathname, mode_t mode, dev_t dev) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(AT_FDCWD, SelfPath, false, TmpFilename);
@@ -813,8 +778,7 @@ uint64_t FileManager::Statfs(const char *path, void *buf) {
 }
 
 uint64_t FileManager::NewFSStatAt(int dirfd, const char *pathname, struct stat *buf, int flag) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(dirfd, SelfPath, (flag & AT_SYMLINK_NOFOLLOW) == 0, TmpFilename);
@@ -828,8 +792,7 @@ uint64_t FileManager::NewFSStatAt(int dirfd, const char *pathname, struct stat *
 }
 
 uint64_t FileManager::NewFSStatAt64(int dirfd, const char *pathname, struct stat64 *buf, int flag) {
-  auto NewPath = GetSelf(pathname);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = pathname;
 
   FDPathTmpData TmpFilename;
   auto Path = GetEmulatedFDPath(dirfd, SelfPath, (flag & AT_SYMLINK_NOFOLLOW) == 0, TmpFilename);
@@ -843,8 +806,7 @@ uint64_t FileManager::NewFSStatAt64(int dirfd, const char *pathname, struct stat
 }
 
 uint64_t FileManager::Setxattr(const char *path, const char *name, const void *value, size_t size, int flags) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, true);
   if (!Path.empty()) {
@@ -858,8 +820,7 @@ uint64_t FileManager::Setxattr(const char *path, const char *name, const void *v
 }
 
 uint64_t FileManager::LSetxattr(const char *path, const char *name, const void *value, size_t size, int flags) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, false);
   if (!Path.empty()) {
@@ -873,8 +834,7 @@ uint64_t FileManager::LSetxattr(const char *path, const char *name, const void *
 }
 
 uint64_t FileManager::Getxattr(const char *path, const char *name, void *value, size_t size) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, true);
   if (!Path.empty()) {
@@ -888,8 +848,7 @@ uint64_t FileManager::Getxattr(const char *path, const char *name, void *value, 
 }
 
 uint64_t FileManager::LGetxattr(const char *path, const char *name, void *value, size_t size) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, false);
   if (!Path.empty()) {
@@ -903,8 +862,7 @@ uint64_t FileManager::LGetxattr(const char *path, const char *name, void *value,
 }
 
 uint64_t FileManager::Listxattr(const char *path, char *list, size_t size) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, true);
   if (!Path.empty()) {
@@ -918,8 +876,7 @@ uint64_t FileManager::Listxattr(const char *path, char *list, size_t size) {
 }
 
 uint64_t FileManager::LListxattr(const char *path, char *list, size_t size) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, false);
   if (!Path.empty()) {
@@ -933,8 +890,7 @@ uint64_t FileManager::LListxattr(const char *path, char *list, size_t size) {
 }
 
 uint64_t FileManager::Removexattr(const char *path, const char *name) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, true);
   if (!Path.empty()) {
@@ -948,8 +904,7 @@ uint64_t FileManager::Removexattr(const char *path, const char *name) {
 }
 
 uint64_t FileManager::LRemovexattr(const char *path, const char *name) {
-  auto NewPath = GetSelf(path);
-  const char *SelfPath = NewPath ? NewPath->c_str() : nullptr;
+  const char *SelfPath = path;
 
   auto Path = GetEmulatedPath(SelfPath, false);
   if (!Path.empty()) {
