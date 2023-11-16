@@ -296,7 +296,7 @@ fextl::string GdbServer::readRegs() {
   memcpy(&GDB.gregs[0], &state.gregs[0], sizeof(GDB.gregs));
   memcpy(&GDB.rip, &state.rip, sizeof(GDB.rip));
 
-  GDB.eflags = CTX->ReconstructCompactedEFLAGS(CurrentThread);
+  GDB.eflags = CTX->ReconstructCompactedEFLAGS(CurrentThread, false, nullptr, 0);
 
   for (size_t i = 0; i < FEXCore::Core::CPUState::NUM_MMS; ++i) {
     memcpy(&GDB.mm[i], &state.mm[i], sizeof(GDB.mm));
@@ -352,7 +352,7 @@ GdbServer::HandledPacketType GdbServer::readReg(const fextl::string& packet) {
     return {encodeHex((unsigned char *)(&state.rip), sizeof(uint64_t)), HandledPacketType::TYPE_ACK};
   }
   else if (addr == offsetof(GDBContextDefinition, eflags)) {
-    uint32_t eflags = CTX->ReconstructCompactedEFLAGS(CurrentThread);
+    uint32_t eflags = CTX->ReconstructCompactedEFLAGS(CurrentThread, false, nullptr, 0);
 
     return {encodeHex((unsigned char *)(&eflags), sizeof(uint32_t)), HandledPacketType::TYPE_ACK};
   }
