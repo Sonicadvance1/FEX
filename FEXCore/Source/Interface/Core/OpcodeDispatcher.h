@@ -686,6 +686,13 @@ public:
   OrderedNode *ReconstructFSW();
   // Returns new x87 stack top from FSW.
   OrderedNode *ReconstructX87StateFromFSW(OrderedNode *FSW);
+  /// TODO: New x87 stack machine ops
+  template<size_t width>
+  void TODO_FLD(OpcodeArgs);
+  template<size_t width>
+  void TODO_FST(OpcodeArgs);
+
+  // Old X87 ops
   template<size_t width>
   void FLD(OpcodeArgs);
   template<uint64_t Lower, uint32_t Upper>
@@ -2152,6 +2159,7 @@ private:
 
   bool Multiblock{};
   uint64_t Entry;
+  IROp_IRHeader *CurrentHeader{};
 
   OrderedNode* _StoreMemAutoTSO(FEXCore::IR::RegisterClassType Class, uint8_t Size, OrderedNode *Addr, OrderedNode *Value, uint8_t Align = 1) {
     if (CTX->IsAtomicTSOEnabled())

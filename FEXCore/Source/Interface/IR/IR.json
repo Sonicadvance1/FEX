@@ -168,7 +168,7 @@
         "SwitchGen": false,
         "JITDispatchOverride": "NoOp"
       },
-      "IRHeader SSA:$Blocks, u64:$OriginalRIP, u32:$BlockCount, u32:$NumHostInstructions": {
+      "IRHeader SSA:$Blocks, u64:$OriginalRIP, u32:$BlockCount, u32:$NumHostInstructions, i1:$HasX87{false}": {
         "SwitchGen": false,
         "JITDispatchOverride": "NoOp"
       },
@@ -2309,6 +2309,75 @@
       }
     },
     "F80": {
+      "GPR = PushStack FPR:$X80Src, OpSize:$OpSize, i1:$Float, u8:$LoadSize": {
+        "Desc": [
+          "Pushes the provided source on to the x87 stack.",
+          "Opsize is 128bit for F80 values, 64-bit for low precision.",
+          "LoadSize the original load size",
+          "Float: 80-bit, 64-bit, 32-bit",
+          "Int: 64-bit, 32-bit, 16-bit",
+          "Returns the new stack top after push."
+        ],
+        "HasSideEffects": true,
+        "DestSize": "4"
+      },
+      "GPR = PopStackMemory GPR:$Addr, OpSize:$SourceSize, i1:$Float, u8:$StoreSize": {
+        "Desc": [
+          "Pops the top value off of the x87 stack and stores it to memory.",
+          "SourceSize is 128bit for F80 values, 64-bit for low precision.",
+          "StoreSize is the store size for conversion:",
+          "Float: 80-bit, 64-bit, or 32-bit",
+          "Int: 64-bit, 32-bit, 16-bit",
+          "Returns the new stack top after pop."
+        ],
+        "HasSideEffects": true,
+        "DestSize": "4"
+      },
+      "StoreStackMemory GPR:$Addr, OpSize:$SourceSize, i1:$Float, u8:$StoreSize": {
+        "Desc": [
+          "Takes the top value off the x87 stack and stores it to memory.",
+          "SourceSize is 128bit for F80 values, 64-bit for low precision.",
+          "StoreSize is the store size for conversion:",
+          "Float: 80-bit, 64-bit, or 32-bit",
+          "Int: 64-bit, 32-bit, 16-bit",
+          "Returns the new stack top after pop."
+        ],
+        "HasSideEffects": true
+      },
+      "GPR = PopStackToStack OpSize:$OpSize, u8:$StackLocation": {
+        "Desc": [
+          "Copies the top of the x87 stack to the new StackLocation and THEN pops the stack pointer.",
+          "Returns the new stack top after pop."
+        ],
+        "HasSideEffects": true,
+        "DestSize": "4"
+      },
+      "GPR = PopStackDestroy": {
+        "Desc": [
+          "Pops the top value off the stack but doesn't save it anywhere.",
+          "Returns the new stack top after pop."
+        ],
+        "HasSideEffects": true,
+        "DestSize": "4"
+      },
+      "FPR = ReadStackValue u8:$StackLocation": {
+        "Desc": [
+          "Reads a value off the stack at the offset"
+        ],
+        "DestSize": "16"
+      },
+      "F80AddStack u8:$SrcStack1, u8:$SrcStack2": {
+        "Desc": [
+          "Adds two stack locations together, storing the result in to the first stack location"
+        ],
+        "HasSideEffects": true
+      },
+      "F80AddValue u8:$SrcStack1, FPR:$X80Src": {
+        "Desc": [
+          "Adds a operand value to a stack location. The result stored in to the stack location provided."
+        ],
+        "HasSideEffects": true
+      },
       "FPR = F80Add FPR:$X80Src1, FPR:$X80Src2": {
         "DestSize": "16",
         "JITDispatch": false

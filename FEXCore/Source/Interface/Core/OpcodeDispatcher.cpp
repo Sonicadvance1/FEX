@@ -4444,6 +4444,7 @@ void OpDispatchBuilder::BeginFunction(uint64_t RIP, fextl::vector<FEXCore::Front
   auto Block = GetNewJumpBlock(RIP);
   SetCurrentCodeBlock(Block);
   IRHeader.first->Blocks = Block->Wrapped(DualListData.ListBegin());
+  CurrentHeader = IRHeader.first;
 
   LOGMAN_THROW_A_FMT(IsDeferredFlagsStored(), "Something failed to calculate flags and now we began with invalid state");
 }
@@ -6896,13 +6897,13 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xD8, 0xF0), 8, &OpDispatchBuilder::FDIV<80, false, false, OpDispatchBuilder::OpResult::RES_ST0>},
       {OPD(0xD8, 0xF8), 8, &OpDispatchBuilder::FDIV<80, false, true, OpDispatchBuilder::OpResult::RES_ST0>},
 
-    {OPDReg(0xD9, 0) | 0x00, 8, &OpDispatchBuilder::FLD<32>},
+    {OPDReg(0xD9, 0) | 0x00, 8, &OpDispatchBuilder::TODO_FLD<32>},
 
     // 1 = Invalid
 
-    {OPDReg(0xD9, 2) | 0x00, 8, &OpDispatchBuilder::FST<32>},
+    {OPDReg(0xD9, 2) | 0x00, 8, &OpDispatchBuilder::TODO_FST<32>},
 
-    {OPDReg(0xD9, 3) | 0x00, 8, &OpDispatchBuilder::FST<32>},
+    {OPDReg(0xD9, 3) | 0x00, 8, &OpDispatchBuilder::TODO_FST<32>},
 
     {OPDReg(0xD9, 4) | 0x00, 8, &OpDispatchBuilder::X87LDENV},
 
@@ -6912,7 +6913,7 @@ constexpr uint16_t PF_F2 = 3;
 
     {OPDReg(0xD9, 7) | 0x00, 8, &OpDispatchBuilder::X87FSTCW},
 
-      {OPD(0xD9, 0xC0), 8, &OpDispatchBuilder::FLD<80>},
+      {OPD(0xD9, 0xC0), 8, &OpDispatchBuilder::TODO_FLD<80>},
       {OPD(0xD9, 0xC8), 8, &OpDispatchBuilder::FXCH},
       {OPD(0xD9, 0xD0), 1, &OpDispatchBuilder::NOPOp}, // FNOP
       // D1 = Invalid
@@ -6986,11 +6987,11 @@ constexpr uint16_t PF_F2 = 3;
 
     // 4 = Invalid
 
-    {OPDReg(0xDB, 5) | 0x00, 8, &OpDispatchBuilder::FLD<80>},
+    {OPDReg(0xDB, 5) | 0x00, 8, &OpDispatchBuilder::TODO_FLD<80>},
 
     // 6 = Invalid
 
-    {OPDReg(0xDB, 7) | 0x00, 8, &OpDispatchBuilder::FST<80>},
+    {OPDReg(0xDB, 7) | 0x00, 8, &OpDispatchBuilder::TODO_FST<80>},
 
 
       {OPD(0xDB, 0xC0), 8, &OpDispatchBuilder::X87FCMOV},
@@ -7029,13 +7030,13 @@ constexpr uint16_t PF_F2 = 3;
       {OPD(0xDC, 0xF0), 8, &OpDispatchBuilder::FDIV<80, false, false, OpDispatchBuilder::OpResult::RES_STI>},
       {OPD(0xDC, 0xF8), 8, &OpDispatchBuilder::FDIV<80, false, true, OpDispatchBuilder::OpResult::RES_STI>},
 
-    {OPDReg(0xDD, 0) | 0x00, 8, &OpDispatchBuilder::FLD<64>},
+    {OPDReg(0xDD, 0) | 0x00, 8, &OpDispatchBuilder::TODO_FLD<64>},
 
     {OPDReg(0xDD, 1) | 0x00, 8, &OpDispatchBuilder::FIST<true>},
 
-    {OPDReg(0xDD, 2) | 0x00, 8, &OpDispatchBuilder::FST<64>},
+    {OPDReg(0xDD, 2) | 0x00, 8, &OpDispatchBuilder::TODO_FST<64>},
 
-    {OPDReg(0xDD, 3) | 0x00, 8, &OpDispatchBuilder::FST<64>},
+    {OPDReg(0xDD, 3) | 0x00, 8, &OpDispatchBuilder::TODO_FST<64>},
 
     {OPDReg(0xDD, 4) | 0x00, 8, &OpDispatchBuilder::X87FRSTOR},
 

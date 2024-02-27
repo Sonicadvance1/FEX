@@ -70,6 +70,7 @@ void PassManager::AddDefaultPasses(FEXCore::Context::ContextImpl *ctx, bool Inli
   FEX_CONFIG_OPT(DisablePasses, O0);
 
   if (!DisablePasses()) {
+    InsertPass(CreateX87StackOptimizationPass());
     InsertPass(CreateContextLoadStoreElimination(ctx->HostFeatures.SupportsAVX));
 
     if (Is64BitMode()) {

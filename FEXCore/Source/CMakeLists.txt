@@ -99,6 +99,7 @@ set (SRCS
   Interface/Core/OpcodeDispatcher/Flags.cpp
   Interface/Core/OpcodeDispatcher/Vector.cpp
   Interface/Core/OpcodeDispatcher/X87.cpp
+  Interface/Core/OpcodeDispatcher/X87New.cpp
   Interface/Core/OpcodeDispatcher/X87F64.cpp
   Interface/Core/OpcodeDispatcher.cpp
   Interface/Core/X86Tables.cpp
@@ -150,6 +151,7 @@ set (SRCS
   Interface/IR/Passes/DeadStoreElimination.cpp
   Interface/IR/Passes/RegisterAllocationPass.cpp
   Interface/IR/Passes/InlineCallOptimization.cpp
+  Interface/IR/Passes/x87StackOptimizationPass.cpp
   Utils/Telemetry.cpp
   Utils/Threads.cpp
   Utils/Profiler.cpp
