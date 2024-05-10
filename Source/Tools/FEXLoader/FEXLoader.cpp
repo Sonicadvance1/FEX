@@ -251,15 +251,28 @@ int main(int argc, char** argv, char** const envp) {
   const bool IsInterpreter = RanAsInterpreter(argv[0]);
 
   ExecutedWithFD = getauxval(AT_EXECFD) != 0;
-  const char* FEXFD = getenv("FEX_EXECVEFD");
-  const std::string_view FEXFDView = FEXFD ? std::string_view {FEXFD} : std::string_view {};
+  const char* FEXFDStr = getenv("FEX_EXECVEFD");
+  int FEXFD {-1};
+  if (FEXFDStr) {
+    const std::string_view FEXFDView {FEXFDStr};
+    std::from_chars(FEXFDView.data(), FEXFDView.data() + FEXFDView.size(), FEXFD, 10);
+    unsetenv("FEX_EXECVEFD");
+  }
+
+  const char* FEXSeccompFDStr = getenv("FEX_SECCOMPFD");
+  int FEXSeccompFD {-1};
+  if (FEXSeccompFDStr) {
+    const std::string_view FEXSeccompFDView {FEXSeccompFDStr};
+    std::from_chars(FEXSeccompFDView.data(), FEXSeccompFDView.data() + FEXSeccompFDView.size(), FEXSeccompFD, 10);
+    unsetenv("FEX_SECCOMPFD");
+  }
 
   LogMan::Throw::InstallHandler(AssertHandler);
   LogMan::Msg::InstallHandler(MsgHandler);
 
-  auto Program = FEX::Config::LoadConfig(IsInterpreter, true, argc, argv, envp, ExecutedWithFD, FEXFDView);
+  auto Program = FEX::Config::LoadConfig(IsInterpreter, true, argc, argv, envp, ExecutedWithFD, FEXFD);
 
-  if (Program.ProgramPath.empty() && !FEXFD) {
+  if (Program.ProgramPath.empty() && FEXFD != -1) {
     // Early exit if we weren't passed an argument
     return 0;
   }
@@ -345,7 +358,7 @@ int main(int argc, char** argv, char** const envp) {
   RootFSRedirect(&Program.ProgramPath, LDPath());
   InterpreterHandler(&Program.ProgramPath, LDPath(), &Args);
 
-  if (!ExecutedWithFD && !FEXFD && !FHU::Filesystem::Exists(Program.ProgramPath)) {
+  if (!ExecutedWithFD && FEXFD != -1 && !FHU::Filesystem::Exists(Program.ProgramPath)) {
     // Early exit if the program passed in doesn't exist
     // Will prevent a crash later
     fextl::fmt::print(stderr, "{}: command not found\n", Program.ProgramPath);
@@ -365,7 +378,7 @@ int main(int argc, char** argv, char** const envp) {
     putenv(HostEnv.data());
   }
 
-  ELFCodeLoader Loader {Program.ProgramPath, FEXFDView, LDPath(), Args, ParsedArgs, envp, &Environment};
+  ELFCodeLoader Loader {Program.ProgramPath, FEXFD, LDPath(), Args, ParsedArgs, envp, &Environment};
 
   if (!Loader.ELFWasLoaded()) {
     // Loader couldn't load this program for some reason
@@ -385,7 +398,7 @@ int main(int argc, char** argv, char** const envp) {
     // Don't need to canonicalize Program.ProgramPath, Config loader will have resolved this already.
     FEXCore::Config::EraseSet(FEXCore::Config::CONFIG_APP_FILENAME, Program.ProgramPath);
     FEXCore::Config::EraseSet(FEXCore::Config::CONFIG_APP_CONFIG_NAME, Program.ProgramName);
-  } else if (FEXFD) {
+  } else if (FEXFD != -1) {
     // Anonymous program.
     FEXCore::Config::EraseSet(FEXCore::Config::CONFIG_APP_FILENAME, "<Anonymous>");
     FEXCore::Config::EraseSet(FEXCore::Config::CONFIG_APP_CONFIG_NAME, "<Anonymous>");
@@ -494,6 +507,8 @@ int main(int argc, char** argv, char** const envp) {
   // Pass in our VDSO thunks
   CTX->AppendThunkDefinitions(FEX::VDSO::GetVDSOThunkDefinitions());
   SignalDelegation->SetVDSOSigReturn();
+
+  SyscallHandler->DeserializeSeccompFD(ParentThread, FEXSeccompFD);
 
   FEXCore::Context::ExitReason ShutdownReason = FEXCore::Context::ExitReason::EXIT_SHUTDOWN;
 
