@@ -8,6 +8,7 @@ $end_info$
 
 #include "Common/Config.h"
 #include "Common/FDUtils.h"
+#include "Common/FEXServerClient.h"
 
 #include "FEXCore/Config/Config.h"
 #include "LinuxSyscalls/FileManagement.h"
@@ -572,6 +573,7 @@ uint64_t FileManager::Close(int fd) {
     RemoveFEXFD(fd);
   }
 #endif
+  if (fd == FEXServerClient::GetServerFD()) return 0;
 
   return ::close(fd);
 }

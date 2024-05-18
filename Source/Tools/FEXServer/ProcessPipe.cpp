@@ -270,6 +270,19 @@ void SendFDSuccessPacket(int Socket, int FD) {
   sendmsg(Socket, &msg, 0);
 }
 
+std::vector<struct pollfd> NewPollFDs{};
+void AddNewPollFD(int FD) {
+  // Check if we need to increase the FD limit.
+  CheckRaiseFDLimit();
+
+  // Add the new client to the temporary array
+  NewPollFDs.emplace_back(pollfd {
+      .fd = FD,
+      .events = POLLIN | POLLPRI | POLLRDHUP,
+      .revents = 0,
+      });
+}
+
 void HandleSocketData(int Socket) {
   std::vector<uint8_t> Data(1500);
   size_t CurrentRead {};
@@ -337,8 +350,62 @@ void HandleSocketData(int Socket) {
       CurrentOffset += sizeof(FEXServerClient::FEXServerRequestPacket::Header);
       break;
     }
+    case FEXServerClient::PacketType::TYPE_GET_NEW_CONNECTION_FD: {
+      // Return a socket that is already connected to the server, ready to use.
+      LogMan::Msg::DFmt("New Connection FD requested!");
+      int SocketFD = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+
+      auto ServerSocketName = FEXServerClient::GetServerSocketName();
+
+      // The entirety of the name is used as a path to a socket that doesn't have any filesystem backing.
+      struct sockaddr_un addr{};
+      addr.sun_family = AF_UNIX;
+      size_t SizeOfSocketString = std::min(ServerSocketName.size() + 1, sizeof(addr.sun_path) - 1);
+      addr.sun_path[0] = 0; // Abstract AF_UNIX sockets start with \0
+      strncpy(addr.sun_path + 1, ServerSocketName.data(), SizeOfSocketString);
+      // Include final null character.
+      size_t SizeOfAddr = sizeof(addr.sun_family) + SizeOfSocketString;
+
+      if (connect(SocketFD, reinterpret_cast<struct sockaddr*>(&addr), SizeOfAddr) == -1) {
+        LogMan::Msg::EFmt("Couldn't connect to FEXServer socket {} {} {}", ServerSocketName, errno, strerror(errno));
+        close(SocketFD);
+        SocketFD = -1;
+      }
+      else {
+        LogMan::Msg::DFmt("Connect happening");
+      }
+
+      if (SocketFD == -1) {
+        SendEmptyErrorPacket(Socket);
+      }
+      else {
+        LogMan::Msg::DFmt("Accepting");
+
+        struct sockaddr_storage Addr{};
+        socklen_t AddrSize{};
+        int NewFD = accept(ServerSocketFD, reinterpret_cast<struct sockaddr*>(&Addr), &AddrSize);
+
+        LogMan::Msg::DFmt("AddingFD");
+
+        AddNewPollFD(NewFD);
+        LogMan::Msg::DFmt("Sending FD");
+
+        // Change the socket to blocking before we send it.
+        auto Flags = fcntl(SocketFD, F_GETFL, 0);
+        fcntl(SocketFD, F_SETFL, Flags & ~O_NONBLOCK);
+
+        SendFDSuccessPacket(Socket, SocketFD);
+        close(SocketFD);
+
+        ProcessPipe::CheckRaiseFDLimit();
+      }
+
+      CurrentOffset += sizeof(FEXServerClient::FEXServerRequestPacket::Header);
+      break;
+    }
     case FEXServerClient::PacketType::TYPE_GET_ROOTFS_PATH: {
       const fextl::string& MountFolder = SquashFS::GetMountFolder();
+      LogMan::Msg::IFmt("Returning Requested rootfs path");
 
       FEXServerClient::FEXServerResultPacket Res {
         .MountPath {
@@ -432,7 +499,6 @@ void WaitForRequests() {
     ts.tv_sec = RequestTimeout;
 
     int Result = ppoll(&PollFDs.at(0), PollFDs.size(), &ts, nullptr);
-    std::vector<struct pollfd> NewPollFDs {};
 
     if (Result > 0) {
       // Walk the FDs and see if we got any results
@@ -449,11 +515,7 @@ void WaitForRequests() {
               int NewFD = accept(ServerSocketFD, reinterpret_cast<struct sockaddr*>(&Addr), &AddrSize);
 
               // Add the new client to the temporary array
-              NewPollFDs.emplace_back(pollfd {
-                .fd = NewFD,
-                .events = POLLIN | POLLPRI | POLLRDHUP,
-                .revents = 0,
-              });
+              AddNewPollFD(NewFD);
             } else if (Event.revents & (POLLHUP | POLLERR | POLLNVAL)) {
               // Listen socket error or shutting down
               break;
@@ -489,6 +551,7 @@ void WaitForRequests() {
 
       // Insert the new FDs to poll
       PollFDs.insert(PollFDs.begin(), NewPollFDs.begin(), NewPollFDs.end());
+      NewPollFDs.clear();
 
       LastDataTime = std::chrono::system_clock::now();
     } else {

@@ -207,8 +207,12 @@ uint64_t ExecveHandler(FEXCore::Core::CpuStateFrame* Frame, const char* pathname
   // AT_EMPTY_PATH is only used if the pathname is empty.
   const bool IsFDExec = (Args.flags & AT_EMPTY_PATH) && strlen(pathname) == 0;
   const bool SupportsProcFSInterpreter = SyscallHandler->FM.SupportsProcFSInterpreterPath();
+  fextl::vector<const char*> EnvpArgs {};
+  char* const* EnvpPtr = envp;
+  bool AlreadyCopiedEnvp {};
   fextl::string FDExecEnv;
   fextl::string FDSeccompEnv;
+  fextl::string FDServerEnv;
 
   bool IsShebang {};
 
@@ -263,10 +267,6 @@ uint64_t ExecveHandler(FEXCore::Core::CpuStateFrame* Frame, const char* pathname
 
   auto SeccompFD = SyscallHandler->SeccompEmulator.SerializeFilters(Frame);
   const auto HasSeccomp = SeccompFD.has_value() && *SeccompFD != -1;
-  fextl::vector<const char*> EnvpArgs {};
-  char* const* EnvpPtr = envp;
-  bool AlreadyCopiedEnvp {};
-
   auto AppendEnvpVariables = [&EnvpArgs, &AlreadyCopiedEnvp, envp, &EnvpPtr]() {
     if (AlreadyCopiedEnvp) {
       return;
@@ -308,6 +308,19 @@ uint64_t ExecveHandler(FEXCore::Core::CpuStateFrame* Frame, const char* pathname
 
     // Insert the FD for FEX to track.
     EnvpArgs.emplace_back(FDSeccompEnv.data());
+  }
+
+  fextl::fmt::print("Execve, do we have new net? {}\n", FEX::HLE::_SyscallHandler->GetFEXServerFromFD() ? "Yes" : "No");
+  if (FEX::HLE::_SyscallHandler->GetFEXServerFromFD()) {
+    LogMan::Msg::DFmt("NewNet execve");
+    AppendEnvpVariables();
+
+    // If the application set up a new network namespace then pass FEXServer's FD through.
+    // Duplicate the FD since this socket is opened with SOCK_CLOEXEC.
+    FDServerEnv = fextl::fmt::format("FEX_SERVERFD={}", dup(FEXServerClient::RequestNewConnectionFD(FEXServerClient::GetServerFD())));
+
+    // Insert the FD for FEX to track.
+    EnvpArgs.emplace_back(FDServerEnv.data());
   }
 
   // If we don't have the interpreter installed we need to be extra careful for ENOEXEC
@@ -422,6 +435,8 @@ struct StackFrameData {
   FEXCore::Context::Context* CTX {};
   FEXCore::Core::CpuStateFrame NewFrame {};
   FEX::HLE::clone3_args GuestArgs {};
+  bool NewNetNamespace{};
+  int NewServerFD{};
 };
 
 struct StackFramePlusRet {
@@ -432,6 +447,13 @@ struct StackFramePlusRet {
 
 [[noreturn]]
 static void CloneBody(StackFrameData* Data, bool NeedsDataFree) {
+  if (Data->NewNetNamespace) {
+    LogMan::Msg::DFmt("Clone3: NewClone after ServerFD\n");
+    close(FEXServerClient::GetServerFD());
+    FEXServerClient::SetServerFD(Data->NewServerFD);
+    FEX::HLE::_SyscallHandler->SetFEXServerFromFD();
+  }
+
   uint64_t Result = FEX::HLE::HandleNewClone(Data->Thread, Data->CTX, &Data->NewFrame, &Data->GuestArgs);
   auto Stack = Data->GuestArgs.NewStack;
   if (NeedsDataFree) {
@@ -496,11 +518,20 @@ static void PrintFlags(uint64_t Flags) {
 #undef FLAGPRINT
 };
 
-static uint64_t Clone2Handler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clone3_args* args) {
+static uint64_t Clone2Handler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clone3_args* args, int *NewServerFD) {
   StackFrameData* Data = (StackFrameData*)FEXCore::Allocator::malloc(sizeof(StackFrameData));
   Data->Thread = static_cast<FEX::HLE::ThreadStateObject*>(Frame->Thread->FrontendPtr);
   Data->CTX = Frame->Thread->CTX;
   Data->GuestArgs = *args;
+
+  Data->NewNetNamespace = (args->args.flags & CLONE_NEWNET) == CLONE_NEWNET;
+  if (Data->NewNetNamespace) {
+    // If the clone is setting up a new network namespace then it won't be able to find FEXServer on execve
+    // Flag that we are under a NEWNET namespace so if execve happens we can inherit the FD.
+    LogMan::Msg::DFmt("NewNet, Enabling net namespace handling");
+    Data->NewServerFD = FEXServerClient::RequestNewConnectionFD(FEXServerClient::GetServerFD());
+    *NewServerFD = Data->NewServerFD;
+  }
 
   // Create a copy of the parent frame
   memcpy(&Data->NewFrame, Frame, sizeof(FEXCore::Core::CpuStateFrame));
@@ -520,13 +551,22 @@ static uint64_t Clone2Handler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clo
   SYSCALL_ERRNO();
 }
 
-static uint64_t Clone3Handler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clone3_args* args) {
+static uint64_t Clone3Handler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clone3_args* args, int *NewServerFD) {
   constexpr size_t Offset = sizeof(StackFramePlusRet);
   StackFramePlusRet* Data = (StackFramePlusRet*)(reinterpret_cast<uint64_t>(args->NewStack) + args->StackSize - Offset);
   Data->Ret = (uint64_t)Clone3HandlerRet;
   Data->Data.Thread = static_cast<FEX::HLE::ThreadStateObject*>(Frame->Thread->FrontendPtr);
   Data->Data.CTX = Frame->Thread->CTX;
   Data->Data.GuestArgs = *args;
+
+  Data->Data.NewNetNamespace = (args->args.flags & CLONE_NEWNET) == CLONE_NEWNET;
+  if (Data->Data.NewNetNamespace) {
+    // If the clone is setting up a new network namespace then it won't be able to find FEXServer on execve
+    // Flag that we are under a NEWNET namespace so if execve happens we can inherit the FD.
+    LogMan::Msg::DFmt("NewNet, Enabling net namespace handling");
+    Data->Data.NewServerFD = FEXServerClient::RequestNewConnectionFD(FEXServerClient::GetServerFD());
+    *NewServerFD = Data->Data.NewServerFD;
+  }
 
   FEX::HLE::kernel_clone3_args HostArgs {};
   HostArgs.flags = args->args.flags;
@@ -623,10 +663,16 @@ uint64_t CloneHandler(FEXCore::Core::CpuStateFrame* Frame, FEX::HLE::clone3_args
       FEX::HLE::_SyscallHandler->LockBeforeFork(Frame->Thread);
 
       uint64_t Result {};
+      int NewServerFD{-1};
       if (args->Type == TYPE_CLONE2) {
-        Result = Clone2Handler(Frame, args);
+        Result = Clone2Handler(Frame, args, &NewServerFD);
       } else {
-        Result = Clone3Handler(Frame, args);
+        Result = Clone3Handler(Frame, args, &NewServerFD);
+      }
+
+      if (NewServerFD != -1) {
+        ///< Close the new serverFD
+        close(NewServerFD);
       }
 
       if (Result != 0) {
@@ -844,10 +890,17 @@ uint64_t SyscallHandler::HandleSyscall(FEXCore::Core::CpuStateFrame* Frame, FEXC
   case SECCOMP_RET_KILL_THREAD: {
     LogMan::Msg::DFmt("[Seccomp] Kill Thread!\n");
     // Ignores signal handler and sigmask
-    uint64_t Mask = 1 << (SIGSYS - 1);
-    SignalDelegation->GuestSigProcMask(SIG_UNBLOCK, &Mask, nullptr);
-    SignalDelegation->UninstallHostHandler(SIGSYS);
-    tgkill(::getpid(), ::gettid(), SIGSYS);
+    siginfo_t Info {
+      .si_signo = SIGSYS,
+      .si_errno = static_cast<int32_t>(DataMasked),
+      .si_code = 1, ///< SYS_SECCOMP
+    };
+
+    Info.si_call_addr = reinterpret_cast<void*>(RIP);
+    Info.si_syscall = Args->Argument[0];
+    Info.si_arch = Arch;
+
+    SignalDelegation->QueueSignal(::getpid(), ::gettid(), SIGSYS, &Info, true);
     break;
   }
   case SECCOMP_RET_TRAP: {

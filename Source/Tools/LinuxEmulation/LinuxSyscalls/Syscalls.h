@@ -8,6 +8,7 @@ $end_info$
 
 #pragma once
 
+#include "Common/FEXServerClient.h"
 #include "LinuxSyscalls/FileManagement.h"
 #include "LinuxSyscalls/LinuxAllocator.h"
 #include "LinuxSyscalls/ThreadManager.h"
@@ -248,6 +249,14 @@ public:
     return this;
   }
 
+  void SetFEXServerFromFD() {
+    FEXServerFromFD = true;
+  }
+
+  bool GetFEXServerFromFD() const {
+    return FEXServerFromFD || FEXServerClient::ServerFDInheritedFromFD();
+  }
+
   void SleepThread(FEXCore::Context::Context* CTX, FEXCore::Core::CpuStateFrame* Frame) override {
     TM.SleepThread(CTX, Frame);
   }
@@ -278,6 +287,7 @@ protected:
   uint32_t GuestKernelVersion {};
 
   FEXCore::Context::Context* CTX;
+  bool FEXServerFromFD{};
 
 private:
 

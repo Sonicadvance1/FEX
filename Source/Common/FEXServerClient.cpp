@@ -82,6 +82,7 @@ int RequestPIDFDPacket(int ServerSocket, PacketType Type) {
 }
 
 static int ServerFD {-1};
+static bool InheritedFromFD{};
 
 fextl::string GetServerLockFolder() {
   return FEXCore::Config::GetDataDirectory() + "Server/";
@@ -143,11 +144,36 @@ fextl::string GetServerSocketName() {
   return ServerSocketPath;
 }
 
+bool ServerFDInheritedFromFD() {
+  return InheritedFromFD;
+}
+
+void SetServerFD(int FD) {
+  ServerFD = FD;
+  InheritedFromFD = true;
+}
+
 int GetServerFD() {
   return ServerFD;
 }
 
 int ConnectToServer(ConnectionOption ConnectionOption) {
+  auto FEXServerSocket = getenv("FEX_SERVERFD");
+  if (FEXServerSocket) {
+    // Use the FEXServerFD socket provided if it is.
+    auto Socket = std::strtoul(FEXServerSocket, nullptr, 0);
+    fextl::fmt::print("Inherited ServerFD: {}\n", Socket);
+
+    // Unset so nothing inherits this.
+    unsetenv("FEX_SERVERFD");
+    SetServerFD(Socket);
+
+    // Make sure to enable O_CLOEXEC.
+    auto Flags = fcntl(Socket, F_GETFL, 0);
+    fcntl(Socket, F_SETFL, Flags | O_CLOEXEC);
+    return Socket;
+  }
+
   auto ServerSocketName = GetServerSocketName();
 
   // Create the initial unix socket
@@ -299,6 +325,11 @@ void RequestServerKill(int ServerSocket) {
 
 int RequestLogFD(int ServerSocket) {
   return RequestPIDFDPacket(ServerSocket, PacketType::TYPE_GET_LOG_FD);
+}
+
+int RequestNewConnectionFD(int ServerSocket) {
+  LogMan::Msg::DFmt("Request new FD Socket");
+  return RequestPIDFDPacket(ServerSocket, PacketType::TYPE_GET_NEW_CONNECTION_FD);
 }
 
 fextl::string RequestRootFSPath(int ServerSocket) {

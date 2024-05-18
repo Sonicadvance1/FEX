@@ -6,6 +6,7 @@ $end_info$
 */
 
 #include "CodeLoader.h"
+#include "Common/FEXServerClient.h"
 
 #include "LinuxSyscalls/SignalDelegator.h"
 #include "LinuxSyscalls/Syscalls.h"

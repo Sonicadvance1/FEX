@@ -12,6 +12,7 @@ enum class PacketType {
   TYPE_GET_LOG_FD,
   TYPE_GET_ROOTFS_PATH,
   TYPE_GET_PID_FD,
+  TYPE_GET_NEW_CONNECTION_FD,
 
   // Result only
   TYPE_SUCCESS,
@@ -53,7 +54,9 @@ fextl::string GetServerRootFSLockFile();
 fextl::string GetTempFolder();
 fextl::string GetServerMountFolder();
 fextl::string GetServerSocketName();
+bool ServerFDInheritedFromFD();
 int GetServerFD();
+void SetServerFD(int FD);
 
 bool SetupClient(char* InterpreterPath);
 
@@ -104,6 +107,7 @@ fextl::string RequestRootFSPath(int ServerSocket);
  * @return FD for pidfd
  */
 int RequestPIDFD(int ServerSocket);
+int RequestNewConnectionFD(int ServerSocket);
 
 /**  @} */
 
