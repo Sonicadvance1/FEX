@@ -511,6 +511,13 @@
         "Desc": [
           "Disables inline syscalls in order to support seccomp handling"
         ]
+      },
+      "Coredump": {
+        "Type": "bool",
+        "Default": "false",
+        "Desc": [
+          "Gives backtraces on unhandled signals that will coredump"
+        ]
       }
     }
   },
