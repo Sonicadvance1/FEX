@@ -36,6 +36,34 @@ namespace Core {
 } // namespace FEXCore
 
 namespace FEX::HLE {
+
+template<typename XStateType>
+struct ContextDataBase {
+  uint64_t OriginalRIP;
+  FEXCore::Context::Context* CTX;
+  FEXCore::Core::InternalThreadState* Thread;
+  FEXCore::Core::CpuStateFrame* Frame;
+  XStateType* fp_state;
+  FEXCore::Core::CpuStateFrame::SynchronousFaultDataStruct* SynchronousFaultData;
+  stack_t* GuestStack;
+  void* HostUContext;
+  siginfo_t* HostSigInfo;
+  uint32_t eflags;
+  int Signal;
+  bool WasFaultToTop;
+  bool IsAVXEnabled;
+};
+
+using ContextData = ContextDataBase<FEXCore::x86_64::xstate>;
+using ContextData_ia32 = ContextDataBase<FEXCore::x86::xstate>;
+
+void SetupUContext_x64(FEXCore::x86_64::ucontext_t* guest_uctx, const ContextData& Data);
+void SetupSigInfo_x64(siginfo_t* guest_siginfo, siginfo_t* HostSigInfo, bool WasFaultToTop,
+                      FEXCore::Core::CpuStateFrame::SynchronousFaultDataStruct* SynchronousFaultData);
+
+void SetupRTUContext_ia32(FEXCore::x86::ucontext_t* guest_uctx, const ContextData_ia32& Data);
+void SetupRTSigInfo_ia32(FEXCore::x86::siginfo_t* guest_info, const ContextData_ia32& Data);
+
 using HostSignalDelegatorFunction = std::function<bool(FEXCore::Core::InternalThreadState* Thread, int Signal, void* info, void* ucontext)>;
 using HostSignalDelegatorFunctionForGuest =
   std::function<bool(FEXCore::Core::InternalThreadState* Thread, int Signal, void* info, void* ucontext, GuestSigAction* GuestAction, stack_t* GuestStack)>;
