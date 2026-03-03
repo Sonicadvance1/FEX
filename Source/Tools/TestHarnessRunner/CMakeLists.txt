@@ -3,7 +3,7 @@ list(APPEND LIBS FEXCore Common JemallocLibs ${PTHREAD_LIB})
 set(SRCS TestHarnessRunner.cpp)
 if (NOT MINGW)
   list(APPEND SRCS TestHarnessRunner/HostRunner.cpp)
-  list(APPEND LIBS LinuxEmulation CommonTools)
+  list(APPEND LIBS LinuxEmulation CommonTools fex_unwind_x86_64)
 endif()
 
 add_executable(TestHarnessRunner ${SRCS})

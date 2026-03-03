@@ -17,6 +17,8 @@ target_link_libraries(fex_unwind_x86_64
   FEXCore
   fmt)
 
+target_link_directories(fex_unwind_x86_64 INTERFACE ${CMAKE_BINARY_DIR}/unwind_x86_64/src/)
+
 target_compile_options(fex_unwind_x86_64 PRIVATE -fcommon)
 add_dependencies(fex_unwind_x86_64 unwind_x86_64)
 

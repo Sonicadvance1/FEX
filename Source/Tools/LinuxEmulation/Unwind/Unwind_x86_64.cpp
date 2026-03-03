@@ -108,7 +108,6 @@ namespace Unwind::x86_64 {
 
     void BacktraceHeader() {
       LogMan::Msg::EFmt("Signal: {}", siginfo.si_signo);
-      LogMan::Msg::EFmt("Register data");
       LogMan::Msg::EFmt("RIP: {:016x}", _context.uc_mcontext.gregs[FEXCore::x86_64::FEX_REG_RIP]);
       LogMan::Msg::EFmt("RAX: {:016x} RBX: {:016x} RCX: {:016x} RDX {:016x}",
         _context.uc_mcontext.gregs[FEXCore::x86_64::FEX_REG_RAX], _context.uc_mcontext.gregs[FEXCore::x86_64::FEX_REG_RBX],
@@ -185,6 +184,7 @@ void Unwinder_x86_64::LoadFileMappings() {
     }
   }
   closedir(dir);
+  close(FD);
 }
 
 void Unwinder_x86_64::Backtrace() {

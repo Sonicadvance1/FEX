@@ -99,7 +99,6 @@ int get_proc_name(unw_addr_space_t as,
   *offp = 0;
   auto Mapping = Unwind->GetFileMapping(addr);
   if (!Mapping) {
-    LogMan::Msg::DFmt("No mapping for 0x{:x}", addr);
     return -UNW_EUNSPEC;
   }
 
