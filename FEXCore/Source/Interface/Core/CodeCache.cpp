@@ -283,7 +283,7 @@ bool CodeCache::SaveData(Core::InternalThreadState& Thread, int fd, const Execut
 
       Guest -= SourceBinary.FileStartVA;
       ::write(fd, &Guest, sizeof(Guest));
-      uint64_t HostCode = Host->HostCode - reinterpret_cast<uintptr_t>(CodeBuffer->Ptr);
+      uint64_t HostCode = Host->HostCode - reinterpret_cast<uintptr_t>(CodeBuffer->GetPtr<void>());
       ::write(fd, &HostCode, sizeof(HostCode));
       uint64_t NumCodePages = Host->CodePages.size();
       ::write(fd, &NumCodePages, sizeof(NumCodePages));
@@ -309,7 +309,7 @@ bool CodeCache::SaveData(Core::InternalThreadState& Thread, int fd, const Execut
   }
 
   // Dump the host code (relocated for position-independent serialization)
-  std::span CodeBufferData(reinterpret_cast<std::byte*>(CodeBuffer->Ptr), reinterpret_cast<std::byte*>(CodeBuffer->Ptr) + CTX.LatestOffset);
+  std::span CodeBufferData(CodeBuffer->GetPtr<std::byte>(), CodeBuffer->GetPtr<std::byte>() + CTX.LatestOffset);
   if (!ApplyCodeRelocations(SerializedBaseAddress, CodeBufferData, Relocations, true)) {
     LOGMAN_THROW_A_FMT(false, "Failed to apply code relocations");
     return false;
@@ -427,15 +427,17 @@ bool CodeCache::LoadData(Core::InternalThreadState* Thread, std::byte* MappedCac
   }
 
   auto CodeBuffer = CTX.GetLatest();
-  LOGMAN_THROW_A_FMT(reinterpret_cast<uintptr_t>(CodeBuffer->Ptr) % 0x1000 == 0, "Expected CodeBuffer base to be page-aligned");
-  const auto Delta = AlignUp(CTX.LatestOffset, 0x1000) - CTX.LatestOffset;
+  LOGMAN_THROW_A_FMT(reinterpret_cast<uintptr_t>(CodeBuffer->GetPtr<void>()) % FEXCore::Utils::FEX_PAGE_SIZE == 0, "Expected CodeBuffer "
+                                                                                                                   "base to be "
+                                                                                                                   "page-aligned");
+  const auto Delta = AlignUp(CTX.LatestOffset, FEXCore::Utils::FEX_PAGE_SIZE) - CTX.LatestOffset;
   CTX.LatestOffset += Delta;
 
   while (CTX.LatestOffset + header.CodeBufferSize > CodeBuffer->UsableSize()) {
     if (Thread) {
       CTX.ClearCodeCache(Thread);
       CodeBuffer = CTX.GetLatest();
-      LogMan::Msg::IFmt("Increased code buffer size to {} MiB for cache load", CodeBuffer->AllocatedSize / 1024 / 1024);
+      LogMan::Msg::IFmt("Increased code buffer size to {} MiB for cache load", CodeBuffer->UsableSize() / 1024 / 1024);
     } else {
       ERROR_AND_DIE_FMT("Cannot extend codebuffer without thread!");
     }
@@ -444,7 +446,7 @@ bool CodeCache::LoadData(Core::InternalThreadState* Thread, std::byte* MappedCac
   // Read CodeBuffer data from file. Make sure the destination is page-aligned.
   // TODO: Only load the data needed for the selected section
   auto CodeBufferRange =
-    std::as_writable_bytes(std::span {CodeBuffer->Ptr, CodeBuffer->UsableSize()}).subspan(CTX.LatestOffset, header.CodeBufferSize);
+    std::as_writable_bytes(std::span {CodeBuffer->GetPtr<uint8_t>(), CodeBuffer->UsableSize()}).subspan(CTX.LatestOffset, header.CodeBufferSize);
   ::memcpy(CodeBufferRange.data(), MappedCacheFile, header.CodeBufferSize);
   MappedCacheFile += header.CodeBufferSize;
   CTX.LatestOffset += header.CodeBufferSize;
@@ -540,11 +542,12 @@ void CodeCache::Validate(const ExecutableFileSectionInfo& Section, fextl::set<ui
   while (CachedCode.size_bytes() > NewCodeBuffer->UsableSize()) {
     ValidationCTX->ClearCodeCache(ValidationThread.get());
     NewCodeBuffer = ValidationCTX->GetLatest();
-    LogMan::Msg::IFmt("Increased cache validation code buffer size to {} MiB", NewCodeBuffer->AllocatedSize / 1024 / 1024);
+    LogMan::Msg::IFmt("Increased cache validation code buffer size to {} MiB", NewCodeBuffer->UsableSize() / 1024 / 1024);
   }
 
   std::span<std::byte> CodeBufferRangeRef =
-    std::as_writable_bytes(std::span {NewCodeBuffer->Ptr, NewCodeBuffer->Ptr + NewCodeBuffer->UsableSize()}).subspan(0, CachedCode.size_bytes());
+    std::as_writable_bytes(std::span {NewCodeBuffer->GetPtr<uint8_t>(), NewCodeBuffer->GetPtr<uint8_t>() + NewCodeBuffer->UsableSize()})
+      .subspan(0, CachedCode.size_bytes());
 
   while (!GuestBlocks.empty()) {
     auto [CompiledBlocks, _, _2, _3, _4] = ValidationCTX->CompileCode(ValidationThread.get(), *GuestBlocks.begin(), 0 /* TODO: Set MaxInst? */);

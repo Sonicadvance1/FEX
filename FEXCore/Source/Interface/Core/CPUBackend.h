@@ -42,9 +42,8 @@ struct GuestToHostMap;
 
 namespace CPU {
   struct CodeBuffer {
-    uint8_t* Ptr;
-    size_t AllocatedSize; // including guard page; see UsableSize()
-    const uint32_t PageSize;
+    uint32_t PageSize;
+    Allocator::LargeAllocation LargeAllocation {};
 
     fextl::unique_ptr<GuestToHostMap> LookupCache;
 
@@ -59,7 +58,18 @@ namespace CPU {
 
     /// Returns the number of bytes available for storing code
     size_t UsableSize() const {
-      return AllocatedSize - PageSize;
+      return GetGuardedSize() - PageSize;
+    }
+
+    /// Returns the base pointer to allocations.
+    template<typename T>
+    T* GetPtr() const {
+      return static_cast<T*>(LargeAllocation.HugeTLBStart);
+    }
+
+    /// Returns size including guardpage
+    size_t GetGuardedSize() const {
+      return LargeAllocation.HugeTLBSize();
     }
   };
 

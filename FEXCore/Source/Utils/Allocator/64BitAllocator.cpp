@@ -256,6 +256,10 @@ void* OSAllocator_64Bit::Mmap(void* addr, size_t length, int prot, int flags, in
     return reinterpret_cast<void*>(-EOVERFLOW);
   }
 
+  if (flags & MAP_HUGETLB) {
+    return reinterpret_cast<void*>(-EINVAL);
+  }
+
   bool Fixed = (flags & MAP_FIXED) || (flags & MAP_FIXED_NOREPLACE);
   length = FEXCore::AlignUp(length, FEXCore::Utils::FEX_PAGE_SIZE);
 

@@ -18,7 +18,9 @@
 #include <new>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <sys/types.h>
+#include <optional>
 
 namespace FEXCore::Allocator {
 enum class ProtectOptions : uint32_t {
@@ -28,6 +30,17 @@ enum class ProtectOptions : uint32_t {
   Exec = (1U << 2),
 };
 FEX_DEF_NUM_OPS(ProtectOptions)
+
+struct LargeAllocation {
+  void* Base;
+  size_t AllocatedSize;
+  void* HugeTLBStart;
+
+  // Returns the size of the TLB region.
+  size_t HugeTLBSize() const {
+    return AllocatedSize - (reinterpret_cast<uintptr_t>(HugeTLBStart) - reinterpret_cast<uintptr_t>(Base));
+  }
+};
 
 #ifdef _WIN32
 #define MAP_FAILED ((void*)-1)
@@ -55,9 +68,10 @@ inline void* VirtualAlloc(size_t Size, bool Execute = false, bool Commit = true)
   return VirtualAlloc(nullptr, Size, Execute, Commit);
 }
 
-inline void* VirtualAllocWithLargePageSupport(size_t Size, size_t huge_page_size, bool Execute = false, bool Commit = true) {
+inline std::optional<LargeAllocation>
+VirtualAllocWithLargePageSupport(size_t Size, size_t huge_page_size, bool Execute = false, bool Commit = true) {
   // Win32 doesn't support selecting huge-page size.
-  return VirtualAlloc(Size, Execute, Commit);
+  return std::nullopt;
 }
 
 inline void VirtualFree(void* Ptr, size_t Size) {
@@ -115,13 +129,70 @@ inline void* VirtualAlloc(void* Base, size_t Size, bool Execute = false, bool Co
   return FEXCore::Allocator::mmap(Base, Size, PROT_READ | PROT_WRITE | (Execute ? PROT_EXEC : 0), MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 }
 
-inline void* VirtualAllocWithLargePageSupport(size_t Size, size_t huge_page_size, bool Execute = false, bool Commit = true) {
+inline std::optional<LargeAllocation>
+VirtualAllocWithLargePageSupport(size_t Size, size_t huge_page_size, bool Execute = false, bool Commit = true) {
   uint32_t map_flags = MAP_PRIVATE | MAP_ANONYMOUS;
   if (huge_page_size != FEXCore::Utils::FEX_PAGE_SIZE) {
     // Allocate with huge page support only if requested.
     map_flags |= MAP_HUGETLB | (FEXCore::ilog2(huge_page_size) << MAP_HUGE_SHIFT);
   }
-  return FEXCore::Allocator::mmap(nullptr, Size, PROT_READ | PROT_WRITE | (Execute ? PROT_EXEC : 0), map_flags, -1, 0);
+
+  auto Ptr = FEXCore::Allocator::mmap(nullptr, Size, PROT_READ | PROT_WRITE | (Execute ? PROT_EXEC : 0), map_flags, -1, 0);
+  if (Ptr != MAP_FAILED && reinterpret_cast<uintptr_t>(Ptr) & (huge_page_size - 1)) {
+    LogMan::Msg::DFmt("Allocator: Failed to align");
+    FEXCore::Allocator::munmap(Ptr, Size);
+  } else if (Ptr != MAP_FAILED) {
+    LogMan::Msg::DFmt("Allocator: big first");
+    return LargeAllocation {
+      .Base = Ptr,
+      .AllocatedSize = Size,
+      .HugeTLBStart = Ptr,
+    };
+  }
+
+  // Allocate a larger size so we can suballocate with huge pages.
+  map_flags = MAP_PRIVATE | MAP_ANONYMOUS;
+  const auto NewSize = Size + huge_page_size;
+
+  LogMan::Msg::DFmt("Allocator: bigger and sub-aligning");
+  Ptr = FEXCore::Allocator::mmap(nullptr, NewSize, PROT_READ | PROT_WRITE | (Execute ? PROT_EXEC : 0), map_flags, -1, 0);
+  if (Ptr == MAP_FAILED) {
+    // Failed to allocate.
+    return std::nullopt;
+  }
+
+  auto OperatingSize = NewSize;
+  void* HugeTLBStart = std::align(huge_page_size, Size, Ptr, OperatingSize);
+
+  if (!HugeTLBStart) {
+    // Failed to align.
+    FEXCore::Allocator::munmap(Ptr, NewSize);
+    return std::nullopt;
+  }
+
+  // Now suballocate.
+  if (huge_page_size != FEXCore::Utils::FEX_PAGE_SIZE) {
+    // Allocate with huge page support only if requested.
+    map_flags |= MAP_HUGETLB | (FEXCore::ilog2(huge_page_size) << MAP_HUGE_SHIFT);
+
+    // Fixed overwrite.
+    map_flags |= MAP_FIXED;
+  }
+
+  LogMan::Msg::DFmt("Allocator: sub-aligning large");
+  if (::mmap(HugeTLBStart, Size, PROT_READ | PROT_WRITE | (Execute ? PROT_EXEC : 0), map_flags, -1, 0) != HugeTLBStart) {
+    LogMan::Msg::DFmt("Allocator: still failed");
+    FEXCore::Allocator::munmap(Ptr, NewSize);
+    return std::nullopt;
+  }
+
+
+  LogMan::Msg::DFmt("Allocator: Allocated huge!");
+  return LargeAllocation {
+    .Base = Ptr,
+    .AllocatedSize = NewSize,
+    .HugeTLBStart = HugeTLBStart,
+  };
 }
 
 inline void VirtualFree(void* Ptr, size_t Size) {
