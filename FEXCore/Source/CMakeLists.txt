@@ -306,6 +306,8 @@ if (ENABLE_JEMALLOC_GLIBC_ALLOC)
   target_link_libraries(JemallocLibs INTERFACE FEX_jemalloc_glibc)
 endif()
 
+target_include_directories(JemallocLibs PRIVATE "${PROJECT_SOURCE_DIR}/include/")
+
 if (NOT MINGW)
   # Dummy project to use for host tools.
   # This overrides use of jemalloc in FEXCore with the normal glibc allocator.

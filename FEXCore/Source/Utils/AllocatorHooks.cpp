@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
-#ifdef ENABLE_FEX_ALLOCATOR
-#include <rpmalloc/rpmalloc.h>
+#include <FEXCore/Utils/PrctlUtils.h>
+#include <FEXCore/Utils/AllocatorDefines.h>
+
 #ifndef _WIN32
 #include <linux/prctl.h>
-#include <sys/prctl.h>
 #include <sys/mman.h>
-#else
+#include <sys/prctl.h>
+#endif
+
+#ifdef ENABLE_FEX_ALLOCATOR
+#include <rpmalloc/rpmalloc.h>
+#ifdef _WIN32
 #define NTDDI_VERSION 0x0A000005
 #include <memoryapi.h>
 #endif
@@ -21,6 +26,34 @@
 namespace FEXCore::Allocator {
 using mmap_hook_type = void* (*)(void* addr, size_t length, int prot, int flags, int fd, off_t offset);
 using munmap_hook_type = int (*)(void* addr, size_t length);
+
+#ifndef _WIN32
+void VirtualName(const char* Name, void* Ptr, size_t Size) {
+  static bool Supports {true};
+  if (Supports) {
+    auto Result = prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, Ptr, Size, Name);
+    if (Result == -1) {
+      // Disable any additional attempts.
+      Supports = false;
+    }
+  }
+}
+
+void VirtualTHPControl(const void* Ptr, size_t Size, THPControl Control) {
+  ::madvise(const_cast<void*>(Ptr), Size, Control == THPControl::Enable ? MADV_HUGEPAGE : MADV_NOHUGEPAGE);
+}
+#else
+void VirtualNameNOP(const char*, const void*, size_t) {}
+void VirtualTHPNOP(const void* Ptr, size_t Size, THPControl Control) {}
+
+VirtualNamePtr VirtualName {VirtualNameNOP};
+VirtualTHPPtr VirtualTHPControl {VirtualTHPNOP};
+
+void SetupHooks(size_t PageSize, HookPtrs Ptrs) {
+  VirtualName = Ptrs.VirtualName;
+  VirtualTHPControl = Ptrs.VirtualTHPControl;
+}
+#endif
 
 #ifdef ENABLE_FEX_ALLOCATOR
 typedef void* (*rp_mmap_hook_type)(size_t size, size_t alignment, size_t* offset, size_t* mapped_size);
@@ -214,7 +247,6 @@ void aligned_free(void* ptr) {
 }
 
 void SetupAllocatorHooks(mmap_hook_type MMapHook, munmap_hook_type MunmapHook) {}
-
 void InitializeAllocator(size_t PageSize) {}
 
 #endif

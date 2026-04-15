@@ -89,6 +89,7 @@ using MUNMAP_Hook = int (*)(void*, size_t);
 FEX_DEFAULT_VISIBILITY extern MMAP_Hook mmap;
 FEX_DEFAULT_VISIBILITY extern MUNMAP_Hook munmap;
 FEX_DEFAULT_VISIBILITY extern void VirtualName(const char* Name, void* Ptr, size_t Size);
+FEX_DEFAULT_VISIBILITY extern void VirtualTHPControl(const void* Ptr, size_t Size, THPControl Control);
 
 // All commit parameters are ignored here, they are unnecessary as Linux supports overcommit
 
@@ -119,10 +120,6 @@ inline bool VirtualProtect(void* Ptr, size_t Size, ProtectOptions options) {
   }
 
   return ::mprotect(Ptr, Size, prot) == 0;
-}
-
-inline void VirtualTHPControl(const void* Ptr, size_t Size, THPControl Control) {
-  ::madvise(const_cast<void*>(Ptr), Size, Control == THPControl::Enable ? MADV_HUGEPAGE : MADV_NOHUGEPAGE);
 }
 
 #endif

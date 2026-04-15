@@ -59,17 +59,6 @@ void* FEX_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t off
   return Result;
 }
 
-void VirtualName(const char* Name, void* Ptr, size_t Size) {
-  static bool Supports {true};
-  if (Supports) {
-    auto Result = prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, Ptr, Size, Name);
-    if (Result == -1) {
-      // Disable any additional attempts.
-      Supports = false;
-    }
-  }
-}
-
 int FEX_munmap(void* addr, size_t length) {
   int Result = Alloc64->Munmap(addr, length);
 
@@ -305,18 +294,5 @@ void UnlockAfterFork(FEXCore::Core::InternalThreadState* Thread, bool Child) {
     Alloc64->UnlockAfterFork(Thread, Child);
   }
 }
-#else
-
-void VirtualNameNOP(const char*, const void*, size_t) {}
-void VirtualTHPNOP(const void* Ptr, size_t Size, THPControl Control) {}
-
-VirtualNamePtr VirtualName {VirtualNameNOP};
-VirtualTHPPtr VirtualTHPControl {VirtualTHPNOP};
-
-void SetupHooks(size_t PageSize, HookPtrs Ptrs) {
-  VirtualName = Ptrs.VirtualName;
-  VirtualTHPControl = Ptrs.VirtualTHPControl;
-}
-
 #endif
 } // namespace FEXCore::Allocator
