@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include <FEXCore/Utils/CompilerDefs.h>
-#include <FEXCore/Utils/EnumOperators.h>
 #include <FEXCore/Utils/LogManager.h>
+#include <FEXCore/Utils/AllocatorDefines.h>
 
 #ifndef _WIN32
 #include <stdlib.h>
@@ -15,32 +15,12 @@
 
 #include <new>
 #include <cstddef>
-#include <cstdint>
 #include <sys/types.h>
 
 namespace FEXCore::Allocator {
-enum class ProtectOptions : uint32_t {
-  None = 0,
-  Read = (1U << 0),
-  Write = (1U << 1),
-  Exec = (1U << 2),
-};
-FEX_DEF_NUM_OPS(ProtectOptions)
-
-enum class THPControl {
-  Enable,
-  Disable,
-};
-
 #ifndef _WIN32
 FEX_DEFAULT_VISIBILITY void SetupHooks(size_t PageSize);
 #else
-using VirtualNamePtr = void (*)(const char*, const void*, size_t);
-using VirtualTHPPtr = void (*)(const void*, size_t, THPControl);
-struct HookPtrs {
-  VirtualNamePtr VirtualName;
-  VirtualTHPPtr VirtualTHPControl;
-};
 FEX_DEFAULT_VISIBILITY void SetupHooks(size_t PageSize, HookPtrs Ptrs);
 #endif
 FEX_DEFAULT_VISIBILITY void ClearHooks();
