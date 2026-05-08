@@ -28,6 +28,7 @@ $end_info$
 #include <FEXCore/Utils/SignalScopeGuards.h>
 
 #include "Windows/Common/Allocator.h"
+#include "Windows/Common/EnvironmentVariablesHandling.h"
 #include "Common/CallRetStack.h"
 #include "Common/JITGuardPage.h"
 #include "Common/Config.h"
@@ -594,6 +595,8 @@ NTSTATUS ProcessInit() {
   const auto NtDll = GetModuleHandle("ntdll.dll");
   const bool IsWine = !!GetProcAddress(NtDll, "wine_get_version");
   OvercommitTracker.emplace(IsWine);
+
+  FEX::Windows::SetupEnvironmentVariableValues(NtDll);
 
   FEX::Windows::Allocator::SetupHooks(NtDll);
 

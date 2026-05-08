@@ -29,6 +29,7 @@ $end_info$
 #include <FEXCore/Utils/SignalScopeGuards.h>
 
 #include "Windows/Common/Allocator.h"
+#include "Windows/Common/EnvironmentVariablesHandling.h"
 #include "Common/CallRetStack.h"
 #include "Common/JITGuardPage.h"
 #include "Common/Config.h"
@@ -562,6 +563,8 @@ void BTCpuProcessInit() {
   if (Sym) {
     WineUnixCall = *reinterpret_cast<decltype(WineUnixCall)*>(Sym);
   }
+
+  FEX::Windows::SetupEnvironmentVariableValues(NtDll);
 
   // wow64.dll will only initialise the cross-process queue if this is set
   GetTLS().Wow64Info().CpuFlags = WOW64_CPUFLAGS_SOFTWARE;
