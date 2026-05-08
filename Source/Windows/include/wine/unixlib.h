@@ -11,6 +11,8 @@ extern "C" {
 
 typedef UINT64 unixlib_handle_t;
 
+extern NTSTATUS(WINAPI* __wine_set_unix_env)(const char*, const char*);
+
 extern NTSTATUS(WINAPI* __wine_unix_call_dispatcher)(unixlib_handle_t, unsigned int, void*);
 
 static inline NTSTATUS __wine_unix_call(unixlib_handle_t handle, unsigned int code, void* args) {
