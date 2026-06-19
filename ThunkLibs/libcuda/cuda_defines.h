@@ -1012,6 +1012,7 @@ CUresult cuDevResourceGenerateDesc(CUdevResourceDesc*, CUdevResource*, unsigned 
 CUresult cuGreenCtxRecordEvent(CUgreenCtx, CUevent);
 CUresult cuGreenCtxWaitEvent(CUgreenCtx, CUevent);
 CUresult cuStreamGetGreenCtx(CUstream, CUgreenCtx*);
+CUresult cuDeviceTotalMem(size_t*, CUdevice);
 #ifdef __cplusplus
 }
 #endif

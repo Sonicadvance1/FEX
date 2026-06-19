@@ -10,6 +10,25 @@ struct fex_gen_config {
 template<typename>
 struct fex_gen_type {};
 
+// internal usage
+CUresult cudart_2_get_primary_context(CUcontext*, CUdevice);
+CUresult tool_runtime_2_callback_hook(void*, uint64_t*);
+CUresult tool_runtime_6_callback_hook(void*, uint64_t*);
+
+CUresult anti_zluda_check_1(uint32_t, uint64_t, anti_zluda_result*);
+
+template<>
+struct fex_gen_config<cudart_2_get_primary_context> : fexgen::custom_host_impl {};
+
+template<>
+struct fex_gen_config<tool_runtime_2_callback_hook> : fexgen::custom_host_impl, fexgen::custom_guest_entrypoint {};
+
+template<>
+struct fex_gen_config<tool_runtime_6_callback_hook> : fexgen::custom_host_impl {};
+
+template<>
+struct fex_gen_config<anti_zluda_check_1> : fexgen::custom_host_impl {};
+
 // Type definitions
 template<>
 struct fex_gen_type<CUctx_st> : fexgen::opaque_type {};
@@ -1535,7 +1554,7 @@ template<>
 struct fex_gen_config<cuCoredumpSetAttributeGlobal> {};
 #endif
 template<>
-struct fex_gen_config<cuGetExportTable> : fexgen::custom_host_impl {};
+struct fex_gen_config<cuGetExportTable> : fexgen::custom_host_impl, fexgen::custom_guest_entrypoint {};
 template<>
 struct fex_gen_param<cuGetExportTable, 0, const void**> : fexgen::ptr_passthrough {};
 #ifndef IS_32BIT_THUNK
@@ -1567,5 +1586,9 @@ struct fex_gen_config<cuGreenCtxWaitEvent> {};
 #ifndef IS_32BIT_THUNK
 template<>
 struct fex_gen_config<cuStreamGetGreenCtx> {};
+#endif
+#ifndef IS_32BIT_THUNK
+template<>
+struct fex_gen_config<cuDeviceTotalMem> {};
 #endif
 } // namespace internal
